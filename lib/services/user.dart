@@ -160,7 +160,7 @@ class UserService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer ${await UserService.getAccessToken()}',
         },
       );
 
@@ -171,8 +171,8 @@ class UserService {
           // Response schema 1
           final userProfile = responseData['user'];
           print(userProfile);
-          AppVariables.set('profile', userProfile);
-          AppVariables.set(
+          AppVariables.update('profile', userProfile);
+          AppVariables.update(
               'watchlist', userProfile['watchList'] as List<dynamic>);
           // Check for `myGroup` and parse if present
           if (userProfile.containsKey('myGroup')) {
@@ -309,12 +309,24 @@ class UserService {
         },
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 201) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
-        return {'success': true, 'data': responseData};
+        return {
+          'success': true,
+          "status": response.statusCode,
+          'data': responseData
+        };
+      } else if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        return {
+          'success': true,
+          "status": response.statusCode,
+          'data': responseData
+        };
       } else {
         return {
           'success': false,
+          "status": response.statusCode,
           'error': jsonDecode(response.body)['message'] ?? 'Failed to like post'
         };
       }

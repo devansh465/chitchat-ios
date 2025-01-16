@@ -27,6 +27,7 @@ class GroupsService {
         'GroupProfilePic': groupData["GroupProfilePic"],
         'createdBy': groupData["createdBy"],
         'createdAt': groupData["createdAt"],
+        "dbIndex": groupData["dbIndex"] ?? 0,
       },
       members: (groupData["members"] as List<dynamic>)
           .map((member) => FriendCircleMember(
@@ -42,6 +43,7 @@ class GroupsService {
                   'semester': member["semester"],
                   'year': member["year"],
                   'userClass': member["userClass"],
+                  'dbIndex': member["dbIndex"] ?? 0,
                 },
               ))
           .toList(),
@@ -126,7 +128,7 @@ class GroupsService {
             'GroupProfilePic': item["GroupProfilePic"],
             'createdBy': item["createdBy"],
             'createdAt': item["createdAt"],
-            'dbIndex': item["dbIndex"],
+            'dbIndex': item["dbIndex"] ?? 0,
           },
           members: (item["members"] as List<dynamic>)
               .map((member) {
@@ -178,6 +180,45 @@ class GroupsService {
       );
 
       if (response.statusCode == 201) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      } else {
+        return {
+          'success': false,
+          'error':
+              jsonDecode(response.body)['message'] ?? 'Unknown error occurred',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateGroup(
+      {String? groupNames,
+      String? groupPics,
+      required String groupId,
+      required int dbIndex}) async {
+    try {
+      final url = Uri.parse('$baseurl/groups');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "groupId": groupId,
+          'dbIndex': dbIndex,
+          'name': groupNames,
+          'description': 'This is a new group',
+          'GroupProfilePic': groupPics,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        await UserService.fetchMyProfile();
+
         return {'success': true, 'data': jsonDecode(response.body)};
       } else {
         return {

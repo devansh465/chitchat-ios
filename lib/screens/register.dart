@@ -186,7 +186,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // Upload image to S3
       value = await uploader!.uploadFiles(
           files: [_profilePicPath],
-          compressionParams: {'width': 100, 'quality': 100},
+          compressionParams: {'width': 600, 'quality': 100},
           showPresignedUrlProgress: true);
       print("Image uploaded to S3: $value");
     }
@@ -491,7 +491,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               controller: _birthdayController,
                               decoration: const InputDecoration(
                                   labelText: "Birthday",
-                                  hintText: "DD/MM/YYYY",
+                                  hintText: "YYYY/MM/DD",
                                   suffixIcon: Icon(Icons.calendar_today)),
                               keyboardType: TextInputType.datetime,
                               validator: (value) {
@@ -503,9 +503,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                   if (parts.length != 3)
                                     return "Invalid date format";
 
-                                  int day = int.parse(parts[0]);
+                                  int day = int.parse(parts[2]);
                                   int month = int.parse(parts[1]);
-                                  int year = int.parse(parts[2]);
+                                  int year = int.parse(parts[0]);
 
                                   DateTime date = DateTime(year, month, day);
                                   if (date.isAfter(DateTime.now())) {
@@ -531,7 +531,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 print(picked);
                                 if (picked != null) {
                                   _birthday =
-                                      "${picked.day}/${picked.month}/${picked.year}";
+                                      "${picked.year}/${picked.month}/${picked.day}";
                                   _birthdayController.text = _birthday!;
                                 }
                               },
@@ -636,6 +636,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               Column(
                                 children: [
                                   TextFormField(
+                                    keyboardType: TextInputType.number,
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return "Please enter your Semester";
@@ -646,6 +647,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                         labelText: "Semester"),
                                     onChanged: (value) => _semester = value,
                                   ),
+                                  if (_educationalBackground == "University")
+                                    universityNameWidget(context),
                                   collegeNameWidget(context),
                                   schoolNameWidget(context)
                                 ],
@@ -654,6 +657,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               Column(
                                 children: [
                                   TextFormField(
+                                    keyboardType: TextInputType.number,
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return "Please enter Year";

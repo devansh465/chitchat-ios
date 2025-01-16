@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/renderpost.dart';
+import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
@@ -435,18 +436,41 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                 children: [
                                   Row(
                                     children: [
-                                      CircleAvatar(
-                                        radius: 35,
-                                        backgroundColor: Colors.orange,
-                                        backgroundImage:
-                                            myProfile?['profilePic'] != null
-                                                ? NetworkImage(
-                                                    myProfile?['profilePic'])
-                                                : null,
-                                        child: myProfile?['profilePic'] == null
-                                            ? Icon(Icons.person,
-                                                color: Colors.white)
-                                            : null, // Avoid overlapping the icon if there's an image
+                                      InkWell(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            PageRouteBuilder(
+                                              opaque: false,
+                                              barrierDismissible: true,
+                                              pageBuilder:
+                                                  (BuildContext context, _,
+                                                      __) {
+                                                return ZoomableImagePopup(
+                                                  imageUrl:
+                                                      myProfile?['profilePic'],
+                                                  onEdit: null,
+                                                  onClose: () =>
+                                                      Navigator.of(context)
+                                                          .pop(),
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        },
+                                        child: CircleAvatar(
+                                          radius: 35,
+                                          backgroundColor: Colors.orange,
+                                          backgroundImage:
+                                              myProfile?['profilePic'] != null
+                                                  ? NetworkImage(
+                                                      myProfile?['profilePic'])
+                                                  : null,
+                                          child: myProfile?['profilePic'] ==
+                                                  null
+                                              ? Icon(Icons.person,
+                                                  color: Colors.white)
+                                              : null, // Avoid overlapping the icon if there's an image
+                                        ),
                                       ),
                                       SizedBox(width: 10),
                                       Column(
@@ -540,7 +564,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                 crossAxisSpacing: 8,
                                 itemCount: posts.length,
                                 itemBuilder: (context, index) {
-                                  final post = posts[index];
+                                  final post = posts.reversed.toList()[index];
                                   if (post?['media'] == null)
                                     return Container();
                                   else if (post?['media'].runtimeType ==

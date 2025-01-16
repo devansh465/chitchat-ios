@@ -1,12 +1,19 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/friendcircle.dart';
+import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/profilePublic.dart';
+import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:page_transition/page_transition.dart';
 import 'package:shimmer/shimmer.dart';
 
 class GroupPrivateViewScreen extends StatefulWidget {
@@ -38,6 +45,12 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
     _getUserLikes();
     _tabController = TabController(length: 2, vsync: this);
+    AppVariables.registerState(this);
+    AppVariables.addListener("profile", (Map<String, dynamic>? data) {
+      setState(() {
+        groupDetails = GroupsService.buildFriendCircleGroup(data!['myGroup']);
+      });
+    });
     _tabController.addListener(() {
       setState(() {
         selectedTab = _tabController.index;
@@ -46,6 +59,13 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   }
 
   void _getUserLikes() async {
+    var _userLikes = await AppVariables.getPersistent<Map<String, bool>>(
+        'likeStatusForMember');
+    if (_userLikes != null) {
+      setState(() {
+        likeStatus.addAll(_userLikes);
+      });
+    }
     List<String>? ids =
         groupDetails?.members.map((member) => member.id).toList();
     Map<String, dynamic> result =
@@ -56,31 +76,272 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       }
     }
     setState(() {});
-    AppVariables.setPersistent<Map<String, int>>(
-        'likeCountForMember', likeCountForMember);
-    print(likeCountForMember);
   }
 
   void toggleLike(String userid, {bool internal = false}) async {
-    print(await AppVariables.getPersistent<Map<String, dynamic>>(
-        'likeCountForMember'));
+    print(
+        "likeStatusForMember>>${await AppVariables.getPersistent<Map<String, dynamic>>('likeStatusForMember')}");
     setState(() {
       likeStatus[userid] = !(likeStatus[userid] ?? false);
       int? user = likeCountForMember[userid];
-      likeCountForMember[userid] = user! + (likeStatus[userid]! ? 1 : -1);
+      likeCountForMember[userid] = (user! + (likeStatus[userid]! ? 1 : -1)) < 0
+          ? 0
+          : (user! + (likeStatus[userid]! ? 1 : -1));
       //+= likeStatus[userid]! ? 1 : -1;
     });
+    AppVariables.setPersistent<Map<String, bool>>(
+        'likeStatusForMember', likeStatus);
+    print(likeStatus);
     if (internal == false) {
       Map<String, dynamic> result = await UserService.likeUser(userId: userid);
+      print(result);
       if (result['success']) {
         print(result['data']);
+        if (result['status'] == 201) {
+          AppVariables.setPersistent<Map<String, bool>>(
+              'likeStatusForMember', likeStatus);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Liked')),
+            );
+          }
+        } else if (result['status'] == 200) {
+          if (mounted) {
+            AppVariables.setPersistent<Map<String, bool>>(
+                'likeStatusForMember', likeStatus);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('like removed')),
+            );
+          }
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['error'])),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['error'])),
+          );
+        }
         toggleLike(userid, internal: true);
       }
     }
+  }
+
+  _editgroup(BuildContext context) async {
+    String groupName = groupDetails!.groupData['name'];
+    File? logoFile;
+    bool isNameEmpty = false;
+    bool isSubmitted = false;
+    S3Uploader? uploader;
+    TextEditingController groupNameController = TextEditingController();
+    groupNameController.text = groupName;
+    String baseurl =
+        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
+    ValueNotifier<FileUploadProgress> _progressNotifier =
+        ValueNotifier<FileUploadProgress>(
+      FileUploadProgress(fileName: 'Uploading...'),
+    );
+    uploader = S3Uploader(
+      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+      progressNotifier: _progressNotifier,
+    );
+    // Add your create functionality here
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(builder: (BuildContext context, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.group_add, color: Colors.blue),
+                SizedBox(width: 8),
+                Text(
+                  'Edit Group',
+                  style: TextStyle(
+                      fontSize: 18,
+                      color: AppColors.background,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins'),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Group Name Input
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: groupNameController,
+                        decoration: InputDecoration(
+                          labelText: 'New Group Name',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: Icon(Icons.group),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            groupName = value;
+                            isNameEmpty = false;
+                          });
+                        },
+                      ),
+                      Visibility(
+                        visible: isNameEmpty,
+                        child: Text(
+                          "Group Name must be filled",
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20),
+
+                  // Logo Picker
+                  isSubmitted
+                      // ignore: dead_code
+                      ? Visibility(
+                          visible: isSubmitted,
+                          child: UploadProgressWidget(
+                              progressNotifier: _progressNotifier))
+                      : InkWell(
+                          onTap: () async {
+                            final ImagePicker _picker = ImagePicker();
+                            final XFile? image = await _picker.pickImage(
+                              source: ImageSource.gallery,
+                            );
+                            if (image != null) {
+                              logoFile = File(image.path);
+                              setState(() {});
+                            }
+                          },
+                          child: Container(
+                            height: 100,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.blue,
+                              ),
+                            ),
+                            child: logoFile == null
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.add_photo_alternate,
+                                            size: 40, color: Colors.grey),
+                                        SizedBox(height: 8),
+                                        Text('Choose new Logo'),
+                                      ],
+                                    ),
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(
+                                      logoFile!,
+                                      fit: BoxFit.fitHeight,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+            actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            actions: [
+              // Cancel Button
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              // Create Button
+              ElevatedButton(
+                onPressed: isSubmitted
+                    ? null
+                    : () async {
+                        if (groupName.length > 0) {
+                          print(groupName);
+                          setState(() {
+                            isNameEmpty = false;
+                            isSubmitted = true;
+                          });
+                          List<String> url = [
+                            groupDetails!.groupData['GroupProfilePic']
+                          ];
+                          if (logoFile != null) {
+                            url = await uploader!.uploadFiles(files: [
+                              logoFile!
+                            ], compressionParams: {
+                              "width": 400,
+                              "quality": 100,
+                            });
+                          }
+                          print(url);
+                          Map<String, dynamic> result =
+                              await GroupsService.updateGroup(
+                                  groupId: groupDetails!.groupId,
+                                  dbIndex: groupDetails!.groupData['dbIndex'],
+                                  groupNames: groupName,
+                                  groupPics: url[0]);
+                          print(result);
+                          if (result['success'] == true) {
+                            if (mounted) {
+                              Navigator.pop(context);
+                              Navigator.pop(context);
+                            }
+                            groupDetails = GroupsService.buildFriendCircleGroup(
+                                result['data']);
+                            setState(() {});
+                            // Navigator.pushReplacement(
+                            //     context,
+                            //     PageTransition(
+                            //         type: PageTransitionType.leftToRight,
+                            //         child: GroupPrivateViewScreen(),
+                            //         duration: Duration(milliseconds: 400)));
+                          } else {
+                            _progressNotifier.value =
+                                _progressNotifier.value.copyWith(
+                              stage: UploadStage.failed,
+                              customStageText: "Error Editing Group",
+                              customStageTextDetail:
+                                  "Only one group can be created at a time",
+                              errorMessage: result['error'],
+                            );
+                          }
+                        } else {
+                          setState(() {
+                            isNameEmpty = true;
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child:
+                    Text('Save Edits', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        });
+      },
+    );
   }
 
   @override
@@ -99,25 +360,43 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         backgroundColor: Colors.transparent,
         elevation: 3,
         titleSpacing: 0,
-        title: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            CircleAvatar(
-              radius: 20,
-              backgroundImage: CachedNetworkImageProvider(
-                  groupDetails?.groupData['GroupProfilePic']),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                groupDetails?.groupData['name'],
-                style: TextStyle(color: Colors.white, fontSize: 16),
+        title: GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                opaque: false,
+                barrierDismissible: true,
+                pageBuilder: (BuildContext context, _, __) {
+                  return ZoomableImagePopup(
+                    imageUrl: groupDetails!.groupData['GroupProfilePic'],
+                    onEdit: () => _editgroup(context),
+                    onClose: () => Navigator.of(context).pop(),
+                  );
+                },
               ),
-            ),
-          ],
+            );
+          },
+          onLongPress: () => _editgroup(context),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              CircleAvatar(
+                radius: 20,
+                backgroundImage: CachedNetworkImageProvider(
+                    groupDetails?.groupData['GroupProfilePic']),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  groupDetails?.groupData['name'],
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           Container(
@@ -154,6 +433,18 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                 print(
                     'Member ${member.id}: ${member.avatarUrl} ${member.additionalData['memberName']}');
                 return ListTile(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.rightToLeft,
+                        child: PublicProfilePage(
+                          dbIndex: member.additionalData['dbIndex'],
+                          uid: member.id,
+                        ),
+                      ),
+                    );
+                  },
                   leading: CircleAvatar(
                     radius: 25,
                     backgroundImage: NetworkImage(member.avatarUrl),

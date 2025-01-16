@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/renderpost.dart';
+import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
@@ -319,18 +320,38 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                               padding: const EdgeInsets.all(10.0),
                               child: Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 35,
-                                    backgroundColor: Colors.orange,
-                                    backgroundImage:
-                                        userProfile?['profilePic'] != null
-                                            ? NetworkImage(
-                                                userProfile?['profilePic'])
-                                            : null,
-                                    child: userProfile?['profilePic'] == null
-                                        ? Icon(Icons.person,
-                                            color: Colors.white)
-                                        : null, // Avoid overlapping the icon if there's an image
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.of(context).push(
+                                        PageRouteBuilder(
+                                          opaque: false,
+                                          barrierDismissible: true,
+                                          pageBuilder:
+                                              (BuildContext context, _, __) {
+                                            return ZoomableImagePopup(
+                                              imageUrl:
+                                                  userProfile?['profilePic'],
+                                              onEdit: null,
+                                              onClose: () =>
+                                                  Navigator.of(context).pop(),
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                    child: CircleAvatar(
+                                      radius: 35,
+                                      backgroundColor: Colors.orange,
+                                      backgroundImage:
+                                          userProfile?['profilePic'] != null
+                                              ? NetworkImage(
+                                                  userProfile?['profilePic'])
+                                              : null,
+                                      child: userProfile?['profilePic'] == null
+                                          ? Icon(Icons.person,
+                                              color: Colors.white)
+                                          : null, // Avoid overlapping the icon if there's an image
+                                    ),
                                   ),
                                   SizedBox(width: 10),
                                   Column(

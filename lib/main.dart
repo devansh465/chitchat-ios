@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    AppVariables.update('baseurl', 'https://8526bdcc624a69.lhr.life');
+    AppVariables.update('baseurl', 'https://8cd4d9bee139a3.lhr.life');
     UserService.isLoggedIn().then((value) async {
       if (value) {
         await UserService.fetchMyProfile();

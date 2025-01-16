@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Interface for serializable objects
 abstract class JsonSerializable {
@@ -13,6 +15,8 @@ class PrefsHelper {
   static final Map<Type, FromJsonFactory> _factories = {};
   static SharedPreferences? _prefs;
 
+  // Initialize shared preferences
+
   // Register type factories
   static void registerType<T>(FromJsonFactory<T> factory) {
     _factories[T] = factory;
@@ -22,111 +26,116 @@ class PrefsHelper {
   static Future<bool> set<T>(String key, T value) async {
     _prefs ??= await SharedPreferences.getInstance();
 
-    if (T == String) {
-      return _prefs!.setString(key, value as String);
-    } else if (T == int) {
-      return _prefs!.setInt(key, value as int);
-    } else if (T == double) {
-      return _prefs!.setDouble(key, value as double);
-    } else if (T == bool) {
-      return _prefs!.setBool(key, value as bool);
-    } else if (T == List<String>) {
-      return _prefs!.setStringList(key, value as List<String>);
-    } else if (value is DateTime) {
-      return _prefs!.setString(key, value.toIso8601String());
-    } else if (value is JsonSerializable) {
-      return _prefs!.setString(key, jsonEncode(value.toJson()));
-    } else if (value is List) {
-      final serializedList = value.map((item) {
-        if (item is JsonSerializable) return item.toJson();
-        return item;
-      }).toList();
-      return _prefs!.setString(key, jsonEncode(serializedList));
-    } else if (value is Map) {
-      return _prefs!.setString(key, jsonEncode(value));
-    } else if (value is Set) {
-      return _prefs!.setString(key, jsonEncode(value.toList()));
-    } else {
-      throw UnsupportedError('Type ${T.toString()} not supported');
+    try {
+      if (T == String) {
+        return _prefs!.setString(key, value as String);
+      } else if (T == int) {
+        return _prefs!.setInt(key, value as int);
+      } else if (T == double) {
+        return _prefs!.setDouble(key, value as double);
+      } else if (T == bool) {
+        return _prefs!.setBool(key, value as bool);
+      } else if (value is List<String>) {
+        return _prefs!.setStringList(key, value);
+      } else if (value is DateTime) {
+        return _prefs!.setString(key, value.toIso8601String());
+      } else if (value is JsonSerializable) {
+        return _prefs!.setString(key, jsonEncode(value.toJson()));
+      } else if (value is List) {
+        final serializedList = value.map((item) {
+          if (item is JsonSerializable) return item.toJson();
+          return item;
+        }).toList();
+        return _prefs!.setString(key, jsonEncode(serializedList));
+      } else if (value is Map) {
+        return _prefs!.setString(key, jsonEncode(value));
+      } else if (value is Set) {
+        return _prefs!.setString(key, jsonEncode(value.toList()));
+      } else {
+        throw UnsupportedError('Type ${T.toString()} not supported');
+      }
+    } catch (e) {
+      print('Error setting preference: $e');
+      return false;
     }
   }
 
-  // Generic getter
+  // Generic getter with type conversion
   static Future<T?> get<T>(String key) async {
     _prefs ??= await SharedPreferences.getInstance();
 
-    if (!_prefs!.containsKey(key)) return null;
+    try {
+      if (!_prefs!.containsKey(key)) return null;
 
-    if (T == String) {
-      return _prefs!.getString(key) as T?;
-    } else if (T == int) {
-      return _prefs!.getInt(key) as T?;
-    } else if (T == double) {
-      return _prefs!.getDouble(key) as T?;
-    } else if (T == bool) {
-      return _prefs!.getBool(key) as T?;
-    } else if (T == List<String>) {
-      return _prefs!.getStringList(key) as T?;
-    } else if (T == DateTime) {
-      final str = _prefs!.getString(key);
-      return str != null ? DateTime.parse(str) as T : null;
-    } else {
-      final str = _prefs!.getString(key);
-      if (str == null) return null;
-
-      final dynamic decoded = jsonDecode(str);
-
-      if (_isListType<T>()) {
-        return _handleListType<T>(decoded);
-      } else if (_isSetType<T>()) {
-        return _handleSetType<T>(decoded);
-      } else if (_isMapType<T>()) {
-        return _handleMapType<T>(decoded);
+      if (T == String) {
+        return _prefs!.getString(key) as T?;
+      } else if (T == int) {
+        return _prefs!.getInt(key) as T?;
+      } else if (T == double) {
+        return _prefs!.getDouble(key) as T?;
+      } else if (T == bool) {
+        return _prefs!.getBool(key) as T?;
+      } else if (T == List<String>) {
+        return _prefs!.getStringList(key) as T?;
+      } else if (T == DateTime) {
+        final str = _prefs!.getString(key);
+        return str != null ? DateTime.parse(str) as T : null;
       } else {
-        return _handleCustomType<T>(decoded);
+        final str = _prefs!.getString(key);
+        if (str == null) return null;
+
+        final decoded = jsonDecode(str);
+        return _convertToType<T>(decoded);
       }
+    } catch (e) {
+      print('Error getting preference: $e');
+      return null;
     }
   }
 
-  // Type checking helpers
-  static bool _isListType<T>() => T.toString().startsWith('List<');
-  static bool _isSetType<T>() => T.toString().startsWith('Set<');
-  static bool _isMapType<T>() => T.toString().startsWith('Map<');
+  // Type conversion helper
+  static T? _convertToType<T>(dynamic decoded) {
+    try {
+      if (T.toString().startsWith('Map<String, bool>')) {
+        if (decoded is Map) {
+          return Map<String, bool>.from(decoded.map(
+              (key, value) => MapEntry(key.toString(), value as bool))) as T;
+        }
+      } else if (T.toString().startsWith('Map<String, int>')) {
+        if (decoded is Map) {
+          return Map<String, int>.from(decoded.map(
+              (key, value) => MapEntry(key.toString(), value as int))) as T;
+        }
+      } else if (T.toString().startsWith('Map<String, double>')) {
+        if (decoded is Map) {
+          return Map<String, double>.from(decoded.map(
+              (key, value) => MapEntry(key.toString(), value as double))) as T;
+        }
+      } else if (T.toString().startsWith('Map<String, String>')) {
+        if (decoded is Map) {
+          return Map<String, String>.from(decoded.map(
+              (key, value) => MapEntry(key.toString(), value.toString()))) as T;
+        }
+      } else if (T.toString().startsWith('List<')) {
+        if (decoded is List) {
+          if (_factories.containsKey(T)) {
+            return decoded.map((item) => _factories[T]!(item)).toList() as T;
+          }
+          return decoded as T;
+        }
+      } else if (T.toString().startsWith('Set<')) {
+        if (decoded is List) {
+          return decoded.toSet() as T;
+        }
+      } else if (_factories.containsKey(T)) {
+        return _factories[T]!(decoded as Map<String, dynamic>);
+      }
 
-  // Handle complex types
-  static T? _handleListType<T>(dynamic decoded) {
-    if (decoded is! List) return null;
-    final itemType = T.toString().split('<')[1].split('>')[0];
-    final factory = _factories[itemType];
-    if (factory != null) {
-      return decoded.map((item) => factory(item)).toList() as T;
+      return decoded as T;
+    } catch (e) {
+      print('Error converting type: $e');
+      return null;
     }
-    return decoded as T;
-  }
-
-  static T? _handleSetType<T>(dynamic decoded) {
-    if (decoded is! List) return null;
-    final itemType = T.toString().split('<')[1].split('>')[0];
-    final factory = _factories[itemType];
-    if (factory != null) {
-      return decoded.map((item) => factory(item)).toSet() as T;
-    }
-    return Set<dynamic>.from(decoded) as T;
-  }
-
-  static T? _handleMapType<T>(dynamic decoded) {
-    if (decoded is! Map) return null;
-    final valueType = T.toString().split(',')[1].split('>')[0].trim();
-    final factory = _factories[valueType];
-    if (factory != null) {
-      return decoded.map((key, value) => MapEntry(key, factory(value))) as T;
-    }
-    return decoded as T;
-  }
-
-  static T? _handleCustomType<T>(dynamic decoded) {
-    final factory = _factories[T];
-    return factory != null ? factory(decoded) : decoded as T;
   }
 
   // Utility methods
