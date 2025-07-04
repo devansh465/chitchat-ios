@@ -1,17 +1,27 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/comments.dart';
+import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/friendcircle.dart';
+import 'package:chitchat/components/renderpost.dart';
+import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
+import 'package:chitchat/services/posts.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:flutterdb/flutterdb.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:shimmer/shimmer.dart';
@@ -25,11 +35,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final List<String> posts = List.generate(
-    100,
-    (index) =>
-        "https://picsum.photos/${300 + (index % 3) * 100}/${400 + (index % 2) * 100}",
-  );
+  final List<dynamic> posts = [];
   final Map<String, bool> likeStatus = {};
   final Map<String, int> likeCountForMember = {};
   final Map<String, dynamic>? profileDetails =
@@ -37,25 +43,109 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   FriendCircleGroup? groupDetails;
 
   int selectedTab = 0;
+
+  late Collection chats;
+  int windowSize = 20;
+  int pageinmemories = 2;
+  List<Message> memories = [];
+  FriendCircleGroup? userGroup;
+  Map<String, dynamic>? userProfile;
+  Map<String, dynamic>? myProfile;
+
+  final ScrollController _scrollController = ScrollController();
+  String? next;
+  bool isLoadingPost = false;
+  bool hasMore = true;
+  bool isLoadingMore = false;
+  bool isLoadingGroup = true;
+  bool isInWatchList = false;
+  bool isWatchListLoading = false;
+  bool isJoinLoading = false;
+
+  Future<List<Message>> initDB() async {
+    final db = FlutterDB();
+
+    try {
+      chats = await db.collection('chats');
+      final _memories = await chats.find({
+        "\$or": [
+          {"message_type": "voice"},
+          {"message_type": "image"},
+          {"message_type": "video"}
+        ]
+      });
+      return _memories.map((e) {
+        return Message.fromJson(e);
+      }).toList();
+    } on Exception catch (e) {
+      // Handle the exception here
+      print('Error initializing database: $e');
+      return Future.value([]);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     print(profileDetails);
+    initDB().then((value) {
+      setState(() {
+        memories = value;
+      });
+    });
     groupDetails =
         GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
     _getUserLikes();
     _tabController = TabController(length: 2, vsync: this);
     AppVariables.registerState(this);
     AppVariables.addListener("profile", (Map<String, dynamic>? data) {
-      setState(() {
-        groupDetails = GroupsService.buildFriendCircleGroup(data!['myGroup']);
-      });
+      if (mounted) {
+        setState(() {
+          groupDetails = GroupsService.buildFriendCircleGroup(data!['myGroup']);
+        });
+      }
     });
     _tabController.addListener(() {
       setState(() {
         selectedTab = _tabController.index;
       });
     });
+    _fetchPosts();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 100 &&
+          !isLoadingPost &&
+          hasMore) {
+        _fetchPosts();
+      }
+    });
+  }
+
+  _fetchPosts() async {
+    if (isLoadingPost) return;
+    setState(() {
+      isLoadingPost = true;
+    });
+    Map<String, dynamic> result = await PostService.fetchMyGroupPosts(
+      groupId: groupDetails!.groupId,
+      limit: 10,
+      next: next,
+    );
+    if (result['success']) {
+      print(result);
+
+      next = result['data']['next'];
+      posts.addAll(result['data']['posts']);
+      setState(() {
+        isLoadingPost = false;
+        hasMore = next != null;
+      });
+    } else {
+      print(result);
+      setState(() {
+        isLoadingPost = false;
+      });
+    }
   }
 
   void _getUserLikes() async {
@@ -102,7 +192,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               'likeStatusForMember', likeStatus);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Liked')),
+              const SnackBar(content: Text('Liked')),
             );
           }
         } else if (result['status'] == 200) {
@@ -110,7 +200,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             AppVariables.setPersistent<Map<String, bool>>(
                 'likeStatusForMember', likeStatus);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('like removed')),
+              const SnackBar(content: Text('like removed')),
             );
           }
         }
@@ -153,7 +243,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Row(
+            title: const Row(
               children: [
                 Icon(Icons.group_add, color: Colors.blue),
                 SizedBox(width: 8),
@@ -183,7 +273,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          prefixIcon: Icon(Icons.group),
+                          prefixIcon: const Icon(Icons.group),
                         ),
                         onChanged: (value) {
                           setState(() {
@@ -194,14 +284,14 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                       ),
                       Visibility(
                         visible: isNameEmpty,
-                        child: Text(
+                        child: const Text(
                           "Group Name must be filled",
                           style: TextStyle(color: Colors.red),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Logo Picker
                   isSubmitted
@@ -232,7 +322,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                               ),
                             ),
                             child: logoFile == null
-                                ? Center(
+                                ? const Center(
                                     child: Column(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
@@ -256,14 +346,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                 ],
               ),
             ),
-            actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             actions: [
               // Cancel Button
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                 },
-                child: Text(
+                child: const Text(
                   'Cancel',
                   style: TextStyle(color: Colors.grey),
                 ),
@@ -334,8 +425,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child:
-                    Text('Save Edits', style: TextStyle(color: Colors.white)),
+                child: const Text('Save Edits',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           );
@@ -347,6 +438,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    AppVariables.unregisterState(this);
     super.dispose();
   }
 
@@ -392,31 +484,16 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               Expanded(
                 child: Text(
                   groupDetails?.groupData['name'],
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ),
             ],
           ),
         ),
         actions: [
-          Container(
-            margin: EdgeInsets.only(left: 20, right: 20),
-            child: Stack(
-              children: [
-                Icon(Icons.notifications, color: Colors.white),
-                Positioned(
-                  right: 0,
-                  child: CircleAvatar(
-                    radius: 6,
-                    backgroundColor: Colors.red,
-                    child: const Text(
-                      '3',
-                      style: TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const NotificationIcon(
+            icon: Icons.notifications,
+            type: NotificationIconType.Notification,
           ),
         ],
       ),
@@ -453,9 +530,186 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                     member.additionalData['memberName'],
                     style: const TextStyle(color: Colors.white),
                   ),
-                  subtitle: Text(
-                    member.additionalData['memberBio'] ?? '',
-                    style: const TextStyle(color: Colors.grey),
+                  subtitle: GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          TextEditingController bioController =
+                              TextEditingController(
+                            text: member.additionalData['memberBio'] != null &&
+                                    member.additionalData['memberBio']
+                                        is List &&
+                                    member
+                                        .additionalData['memberBio'].isNotEmpty
+                                ? GroupsService.parseBio(
+                                        member.additionalData['memberBio'].last)
+                                    .bio
+                                : '',
+                          );
+                          bool isSubmitting = false;
+                          String? errorText;
+
+                          return StatefulBuilder(
+                            builder: (context, setState) {
+                              return AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                title: const Text(
+                                  "Add a bio for this friend",
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      "Let them know how you feel about them! Write something nice or memorable.",
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    TextField(
+                                      controller: bioController,
+                                      maxLength: 80,
+                                      maxLines: 2,
+                                      decoration: InputDecoration(
+                                        hintText: "E.g. Best teammate ever! 🎉",
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        errorText: errorText,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: isSubmitting
+                                        ? null
+                                        : () => Navigator.pop(context),
+                                    child: const Text("Cancel"),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: isSubmitting
+                                        ? null
+                                        : () async {
+                                            if (bioController.text
+                                                .trim()
+                                                .isEmpty) {
+                                              setState(() {
+                                                errorText =
+                                                    "Bio cannot be empty";
+                                              });
+                                              return;
+                                            }
+                                            setState(() {
+                                              isSubmitting = true;
+                                              errorText = null;
+                                            });
+                                            // Call API to update bio
+                                            final result = await GroupsService
+                                                .updateMemberBio(
+                                              groupId: groupDetails!.groupId,
+                                              userId: member.id,
+                                              bio: bioController.text.trim(),
+                                            );
+                                            setState(() {
+                                              isSubmitting = false;
+                                            });
+                                            if (result['success'] == true) {
+                                              if (mounted) {
+                                                Navigator.pop(context);
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                      content:
+                                                          Text("Bio updated!")),
+                                                );
+                                              }
+                                              setState(() {
+                                                member.additionalData[
+                                                    'memberBio'] = [
+                                                  GroupsService.parseBio(
+                                                          bioController.text)
+                                                      .bio
+                                                ];
+                                              });
+                                            } else {
+                                              setState(() {
+                                                errorText = result['error'] ??
+                                                    "Failed to update bio";
+                                              });
+                                            }
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: isSubmitting
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white),
+                                          )
+                                        : const Text("Save",
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                    child: Wrap(
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              if (member.additionalData['memberBio'] != null &&
+                                  member.additionalData['memberBio'] is List &&
+                                  member.additionalData['memberBio'].isNotEmpty)
+                                TextSpan(
+                                    text: GroupsService.parseBio(member
+                                            .additionalData['memberBio'][0])
+                                        .editedBy,
+                                    style:
+                                        const TextStyle(color: Colors.white)),
+                              WidgetSpan(child: SizedBox(width: 5)),
+                              TextSpan(
+                                text:
+                                    "${(member.additionalData['memberBio'] != null && member.additionalData['memberBio'] is List && member.additionalData['memberBio'].isNotEmpty) ? GroupsService.parseBio(member.additionalData['memberBio'].last).bio : ''}",
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 8.0),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.edit,
+                                          color: Colors.blue, size: 18),
+                                      if (member.additionalData['memberBio']
+                                              .length <
+                                          1)
+                                        const Text(
+                                          "Add a bio",
+                                          style: TextStyle(color: Colors.grey),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   trailing: InkWell(
                     borderRadius: BorderRadius.circular(8),
@@ -531,7 +785,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                 border:
                                     Border.all(color: Colors.grey, width: 0.5),
                                 borderRadius:
-                                    BorderRadius.all(Radius.circular(50)),
+                                    const BorderRadius.all(Radius.circular(50)),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.grey.withOpacity(0.5),
@@ -554,9 +808,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                         MediaQuery.of(context).size.width * 0.3,
                                     height: 50,
                                     decoration: selectedTab == 0
-                                        ? BoxDecoration(
-                                            color: const Color.fromARGB(
-                                                255, 0, 46, 124),
+                                        ? const BoxDecoration(
+                                            color:
+                                                Color.fromARGB(255, 0, 46, 124),
                                             borderRadius: BorderRadius.only(
                                               topLeft: Radius.circular(50),
                                               bottomLeft: Radius.circular(50),
@@ -596,9 +850,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                         1,
                                     height: 50,
                                     decoration: selectedTab == 1
-                                        ? BoxDecoration(
-                                            color: const Color.fromARGB(
-                                                255, 0, 46, 124),
+                                        ? const BoxDecoration(
+                                            color:
+                                                Color.fromARGB(255, 0, 46, 124),
                                             borderRadius: BorderRadius.only(
                                               topRight: Radius.circular(50),
                                               bottomRight: Radius.circular(50),
@@ -636,22 +890,32 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   backgroundColor:
                                       const Color.fromARGB(255, 0, 46, 124),
                                   child: IconButton(
-                                    icon: Icon(Icons.chat, color: Colors.white),
+                                    icon: const Icon(Icons.chat,
+                                        color: Colors.white),
                                     onPressed: () {
-                                      // Handle search button press
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const ChatScreen(),
+                                        ),
+                                      );
                                     },
                                   ),
                                 ),
-                                SizedBox(width: 10),
+                                const SizedBox(width: 10),
                                 CircleAvatar(
                                   radius: 25,
                                   backgroundColor:
                                       const Color.fromARGB(255, 0, 46, 124),
                                   child: IconButton(
-                                    icon: Icon(Icons.add_a_photo_sharp,
+                                    icon: const Icon(Icons.add_a_photo_sharp,
                                         color: Colors.white),
                                     onPressed: () {
-                                      // Handle search button press
+                                      CreatePost.show(context,
+                                          myGroupId: groupDetails!.groupId,
+                                          isGroupPost: true,
+                                          isPost: true);
                                     },
                                   ),
                                 ),
@@ -659,7 +923,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                         ],
                       ),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -668,24 +932,42 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                           children: [
                             // Chat View
                             MasonryGridView.builder(
-                              controller: scrollController,
-                              gridDelegate:
-                                  const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                              ),
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              itemCount: posts.length,
-                              itemBuilder: (context, index) {
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    posts[index],
-                                    fit: BoxFit.cover,
-                                  ),
-                                );
-                              },
-                            ),
+                                controller: scrollController,
+                                gridDelegate:
+                                    const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                ),
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                itemCount: posts.length,
+                                itemBuilder: (context, index) {
+                                  final post = posts[index];
+                                  if (post?['media'] == null)
+                                    return Container();
+                                  else if (post?['media'].runtimeType ==
+                                      String) {
+                                    post['media'] = jsonDecode(post['media']);
+                                  }
+                                  try {
+                                    return DynamicPostWidget(
+                                      content: post['content'],
+                                      media: List<Map<String, dynamic>>.from(
+                                          (post['media'] as List<dynamic>)
+                                              .map((m) => {
+                                                    'type': m['type'],
+                                                    'url': m['url'],
+                                                  })),
+                                      postId: post['_id'],
+                                      author: post['author'],
+                                      group: post['group'],
+                                      authorName: post['authorName'],
+                                      profilePic: post['profilePic'],
+                                      likes: post['likes'],
+                                    );
+                                  } on Exception catch (e) {
+                                    return Container();
+                                  }
+                                }),
 
                             // Posts View (Masonry Grid)
                             MasonryGridView.builder(
@@ -696,15 +978,27 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                               ),
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
-                              itemCount: posts.length,
+                              itemCount: memories.length,
                               itemBuilder: (context, index) {
                                 return ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    posts[index],
-                                    fit: BoxFit.cover,
-                                  ),
-                                );
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: memories[index].messageType ==
+                                            MessageType.video
+                                        ? VideoMessageView(
+                                            url: memories[index].message,
+                                          )
+                                        : memories[index].messageType ==
+                                                MessageType.image
+                                            ? CachedNetworkImage(
+                                                imageUrl:
+                                                    memories[index].message,
+                                                placeholder: (context, url) =>
+                                                    const CircularProgressIndicator(),
+                                                errorWidget:
+                                                    (context, url, error) =>
+                                                        const Icon(Icons.error),
+                                              )
+                                            : null);
                               },
                             ),
                           ],

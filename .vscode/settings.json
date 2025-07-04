@@ -1,0 +1,10 @@
+{
+    "vsmqtt.brokerProfiles": [
+        {
+            "name": "ccc",
+            "host": "https://zpznf11l-1883.inc1.devtunnels.ms",
+            "port": 1883,
+            "clientId": "vsmqtt_client_8bbc"
+        }
+    ]
+}

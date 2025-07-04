@@ -6,6 +6,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
+import 'package:chitchat/screens/groupPublic.dart';
 import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/fileUploader.dart';
@@ -170,7 +171,9 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                                     context,
                                     PageTransition(
                                       type: PageTransitionType.rightToLeft,
-                                      child: GroupPrivateViewScreen(),
+                                      child: GroupPublicViewScreen(
+                                        groupId: groupId,
+                                      ),
                                     ),
                                   );
                                 },

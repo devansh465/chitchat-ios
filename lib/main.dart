@@ -1,5 +1,11 @@
+import 'dart:async';
+
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/createStory.dart';
+import 'package:chitchat/services/fcm.dart';
+import 'package:chitchat/services/notification.dart';
 import 'package:flutter/material.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -9,13 +15,15 @@ import 'firebase_options.dart';
 
 import 'screens/home.dart';
 import 'screens/register.dart';
+import 'package:oktoast/oktoast.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(MaterialApp(home: LoginScreen()));
+  await FCMHandler.initialize();
+  runApp(OKToast(child: MaterialApp(home: LoginScreen())));
 }
 
 class LoginScreen extends StatefulWidget {
@@ -37,10 +45,19 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    AppVariables.update('baseurl', 'https://00a4a6842ad527.lhr.life');
+    AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
     UserService.isLoggedIn().then((value) async {
       if (value) {
-        await UserService.fetchMyProfile();
+        await UserService.refreshFCMToken();
+        Map<String, dynamic> result = await UserService.fetchMyProfile();
+        if (result['success']) {
+          if (result['group'] != null) {
+            FriendCircleGroup myGroup = result['group'] as FriendCircleGroup;
+            await NotificationService.getGroupJoinRequests(
+                context, myGroup.groupId,
+                showLoaders: false, showMessage: false);
+          }
+        }
 
         Future.delayed(Duration(seconds: 3), () {
           Navigator.pushReplacement(

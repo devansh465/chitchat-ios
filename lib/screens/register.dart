@@ -205,10 +205,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       "year": _year,
       "profilePic": value[0] ?? googleUser?.photoUrl,
       "role": "appTest",
-      "fcmToken": AppVariables.get("fcmToken") ?? "",
+      "fcmToken": await UserService.getFcmToken() ?? "",
     };
 
-    // Replace this with your POST API call
     print("Submitting form: $formData");
     http.Response response = await http.post(
       Uri.parse('$baseurl/register'),
@@ -299,14 +298,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       autoFillOnSelection: false,
       asyncSuggestions: (p0) async {
         print(p0);
-        return autocompleteSchool(p0);
+        return autocompletecollege(p0);
       },
       validator: (value) => value!.isEmpty ? "College Name is required" : null,
       suggestionBuilder: (context, suggestion) {
         print(suggestion.runtimeType);
         return ListTile(
+          isThreeLine: true,
           title: Text(
-            suggestion["school_name"],
+            suggestion["Name of the college"],
             style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 16,
@@ -314,14 +314,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               color: Colors.black87,
             ),
           ),
-          subtitle: Text(
-            "${suggestion["village"]}, ${suggestion["block"]}, ${suggestion["district"]}, ${suggestion["state"]}",
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 14,
-              color: Colors.black54,
-              height: 1.2,
-            ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                suggestion["Affiliated To University"],
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                "${suggestion["College address"]}, ${suggestion["State"]}",
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 14,
+                  color: Colors.black54,
+                  height: 1.2,
+                ),
+              ),
+            ],
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -330,8 +344,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         );
       },
       onSelected: (value, controller) {
-        controller.text = value["school_name"];
-        _college = value["school_name"];
+        controller.text = value["Name of the college"];
+        _college = value["Name of the college"];
       },
     );
   }
@@ -386,7 +400,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget build(BuildContext context) {
     return Theme(
       data: ThemeData.dark().copyWith(
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color.fromARGB(67, 66, 66, 66),
           elevation: 10,
         ),

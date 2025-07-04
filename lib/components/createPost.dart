@@ -1,0 +1,221 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:better_open_file/better_open_file.dart';
+import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:camerawesome/pigeon.dart';
+import 'package:chitchat/screens/filePreview.dart';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:gallery_saver_plus/gallery_saver.dart';
+import 'package:vs_media_picker/vs_media_picker.dart';
+
+class CreatePost {
+  // late StreamSubscription<MediaCapture?> _captureStateSubscription;
+
+  static ScrollController _scrollController2 = ScrollController();
+
+  static dynamic show(BuildContext context,
+      {bool isGroupPost = false,
+      bool isPost = true,
+      required String? myGroupId}) {
+    ValueNotifier<bool> isNextButtonVisible = ValueNotifier(false);
+    List<PickedAssetModel> selectedFiles = <PickedAssetModel>[];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color.fromRGBO(0, 0, 0, 1),
+      builder: (context) => Stack(
+        children: [
+          VSMediaPicker(
+            maxPickImages: 100,
+            gridViewController: _scrollController2,
+            singlePick: false,
+            onlyImages: false,
+            appBarColor: Colors.black,
+            gridViewPhysics: const ScrollPhysics(),
+            pathList: (path) {
+              if (path.isNotEmpty) {
+                print("path: ${path.map((e) => e.type).toList()}");
+              }
+              selectedFiles = path;
+              isNextButtonVisible.value = selectedFiles.isNotEmpty;
+            },
+            appBarLeadingWidget: Padding(
+              padding: const EdgeInsets.only(bottom: 15, right: 15),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 1.2,
+                            )),
+                        child: const Row(
+                          children: [
+                            Text(
+                              'Cancel',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w400),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(
+                      width: 10,
+                    ),
+                    RepaintBoundary(
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: isNextButtonVisible,
+                        builder: (context, isVisible, child) {
+                          return isVisible
+                              ? InkWell(
+                                  onTap: () async {
+                                    await Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) => FilePreviewPage(
+                                                files: selectedFiles,
+                                                isGroupPost: isGroupPost,
+                                                isPost: isPost,
+                                                myGroupId: myGroupId,
+                                              )),
+                                    );
+                                    // Navigator.pop(context);
+                                    // showModalBottomSheet(
+                                    //   context: context,
+                                    //   isScrollControlled: true,
+                                    //   isDismissible: false,
+                                    //   enableDrag: false,
+                                    //   backgroundColor: Colors.black,
+                                    //   builder: (context) =>
+                                    //       FlutterStoryEditor(
+                                    //     controller: controller,
+                                    //     captionController:
+                                    //         _captionController,
+                                    //     selectedFiles: selectedFiles
+                                    //         .map(
+                                    //           (e) =>
+                                    //               e.file ??
+                                    //               File(e.path ?? ""),
+                                    //         )
+                                    //         .toList(),
+                                    //     onSaveClickListener: (files) {
+                                    //       // Handle save click logic here
+                                    //       print(
+                                    //         "Selected files: ${files.map((e) => e.path).toList()}",
+                                    //       );
+                                    //     },
+                                    //   ),
+                                    // );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                        color: Colors.blue,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 1.2,
+                                        )),
+                                    child: const Row(
+                                      children: [
+                                        Text(
+                                          'Next',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w400),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.8),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(20),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  'Select files to send',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Function to save the file to the gallery
+  List<String> _filePaths = [];
+  void _saveToGallery(String filePath, bool isVideo) {
+    // Check if the file path is already saved to avoid duplicates
+    if (!_filePaths.contains(filePath)) {
+      _filePaths.add(filePath);
+    } else {
+      debugPrint('File already saved: $filePath');
+      return;
+    }
+    if (isVideo) {
+      GallerySaver.saveVideo(filePath).then((success) {
+        if (success == true) {
+          debugPrint('Video saved to gallery: $filePath');
+        } else {
+          debugPrint('Failed to save video: $filePath');
+        }
+      });
+    } else {
+      GallerySaver.saveImage(filePath).then((success) {
+        if (success == true) {
+          debugPrint('Image saved to gallery: $filePath');
+        } else {
+          debugPrint('Failed to save image: $filePath');
+        }
+      });
+    }
+  }
+
+  // Function to preview the file
+  void _previewFile(String filePath) {
+    OpenFile.open(filePath);
+  }
+}

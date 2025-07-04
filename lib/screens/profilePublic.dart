@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
@@ -33,6 +34,8 @@ class PublicProfilePage extends StatefulWidget {
 class _PublicProfilePageState extends State<PublicProfilePage> {
   FriendCircleGroup? userGroup;
   Map<String, dynamic>? userProfile;
+  Map<String, dynamic>? myProfile;
+
   final ScrollController _scrollController = ScrollController();
   List<dynamic> posts = [];
   String? next;
@@ -50,7 +53,6 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
     super.initState();
     _getprofile();
     _fetchPosts();
-
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 100 &&
@@ -144,65 +146,12 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded),
-                onPressed: () {},
-                color: Colors.white,
-                iconSize: 30,
-                padding: const EdgeInsets.only(right: 20),
-              ),
-              Positioned(
-                right: 20,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.messenger_outline_rounded),
-                onPressed: () {},
-                color: Colors.white,
-                iconSize: 30,
-                padding: const EdgeInsets.only(right: 30),
-              ),
-              Positioned(
-                right: 25,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          NotificationIcon(
+              icon: Icons.notifications,
+              type: NotificationIconType.Notification),
+          NotificationIcon(
+            icon: Icons.messenger_outline_rounded,
+            type: NotificationIconType.Message,
           ),
         ],
         title: const Text(
@@ -307,10 +256,8 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                   ),
                 ),
                 padding: const EdgeInsets.all(16),
-                child: isLoadingPost
-                    ? Center(
-                        child: CircularProgressIndicator(),
-                      )
+                child: userProfile == null
+                    ? Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(
                         controller: scrollController,
                         child: Column(
@@ -553,13 +500,93 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 10),
-                              child: Text(
-                                "${userProfile?['bio'] ?? 'No bio available'}",
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.background,
-                                    fontFamily: "Poppins"),
-                                textAlign: TextAlign.left,
+                              child: GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      final bioList = userProfile?['bio'] ?? [];
+                                      bioList.removeWhere((bio) => bio == null);
+                                      return AlertDialog(
+                                        backgroundColor: AppColors.background,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(20)),
+                                        title: Row(
+                                          children: [
+                                            Icon(Icons.info_outline,
+                                                color: AppColors.textSecondary),
+                                            SizedBox(width: 8),
+                                            Text('Bio History',
+                                                style: TextStyle(
+                                                    fontFamily: "Poppins",
+                                                    color: AppColors.primary)),
+                                          ],
+                                        ),
+                                        content: bioList.isEmpty
+                                            ? Text("No bio available.",
+                                                style: TextStyle(
+                                                    fontFamily: "Poppins",
+                                                    color: AppColors.success))
+                                            : SizedBox(
+                                                width: double.maxFinite,
+                                                child: ListView.separated(
+                                                  shrinkWrap: true,
+                                                  itemCount: bioList.length,
+                                                  separatorBuilder: (_, __) =>
+                                                      Divider(),
+                                                  itemBuilder: (context, idx) {
+                                                    final bioObj =
+                                                        GroupsService.parseBio(
+                                                            bioList[idx]);
+                                                    return ListTile(
+                                                      title: Text(
+                                                        bioObj.bio ?? "No bio",
+                                                        style: TextStyle(
+                                                            fontFamily:
+                                                                "Poppins",
+                                                            color:
+                                                                Colors.white),
+                                                      ),
+                                                      subtitle: Text(
+                                                        "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Colors.grey[700],
+                                                          fontFamily: "Poppins",
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                        actions: [
+                                          TextButton(
+                                            child: Text('Close',
+                                                style: TextStyle(
+                                                    fontFamily: "Poppins",
+                                                    color: AppColors.primary)),
+                                            onPressed: () =>
+                                                Navigator.of(context).pop(),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                                child: Text(
+                                  userProfile?['bio'].length > 0 &&
+                                          !(userProfile?['bio'] as List)
+                                              .every((bio) => bio == null)
+                                      ? "#${GroupsService.parseBio(userProfile?['bio'].last).editedBy ?? ''} ${GroupsService.parseBio(userProfile?['bio'].last).bio}"
+                                      : 'No bio available',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.background,
+                                      fontFamily: "Poppins"),
+                                  textAlign: TextAlign.left,
+                                ),
                               ),
                             ),
                             Divider(
@@ -623,6 +650,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                                       group: post['group'],
                                       authorName: post['authorName'],
                                       profilePic: post['profilePic'],
+                                      likes: post['likes'],
                                     );
                                   } on Exception catch (e) {
                                     return Container();
@@ -636,6 +664,12 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                                   // );
                                 },
                               ),
+                            if (isLoadingPost) ...[
+                              Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              SizedBox(height: 10),
+                            ]
                           ],
                         ),
                       ),

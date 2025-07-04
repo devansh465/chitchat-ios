@@ -4,12 +4,16 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/main.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
 import 'package:chitchat/services/fileUploader.dart';
+import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:flutter/material.dart';
@@ -60,11 +64,15 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       print('Profile fetched successfully:');
       print(result['data']);
       myProfile = result['data'];
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
 
       if (result['group'] != null) {
         myGroup = result['group'] as FriendCircleGroup;
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
         print('Group Name: ${myGroup?.groupData['name']}');
         print('Members:');
         for (var member in myGroup!.members) {
@@ -86,10 +94,13 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       );
       print('Error fetching profile: ${result['error']}');
     }
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   _fetchPosts() async {
+    if (!mounted) return;
     if (isLoadingPost) return;
     setState(() {
       isLoadingPost = true;
@@ -239,65 +250,49 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded),
-                onPressed: () {},
-                color: Colors.white,
-                iconSize: 30,
-                padding: const EdgeInsets.only(right: 20),
-              ),
-              Positioned(
-                right: 20,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          NotificationIcon(
+              icon: Icons.notifications,
+              type: NotificationIconType.Notification),
+          NotificationIcon(
+            icon: Icons.messenger_outline_rounded,
+            type: NotificationIconType.Message,
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.messenger_outline_rounded),
-                onPressed: () {},
-                color: Colors.white,
-                iconSize: 30,
-                padding: const EdgeInsets.only(right: 30),
-              ),
-              Positioned(
-                right: 25,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text("Settings"),
+                    content: Text("Do you want to sign out?"),
+                    actions: [
+                      TextButton(
+                        child: Text("Cancel"),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      TextButton(
+                        child: Text("Sign Out"),
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await UserService.signOut((x) => {});
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.leftToRight,
+                              child: LoginScreen(),
+                            ),
+                            (Route<dynamic> route) => false,
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
         ],
         title: const Text(
@@ -353,8 +348,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                           group: myGroup!,
                           size: 200,
                           nodeSize: (myGroup!.members.length > 5
-                              ? myGroup!.members.length * 10.0
-                              : 90.0),
+                              ? myGroup!.members.length * 8.0
+                              : 80.0),
                           nodeBorderColor: Colors.white24,
                           edgeStyle: EdgeStyle(
                             width: 2,
@@ -419,10 +414,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                   ),
                 ),
                 padding: const EdgeInsets.all(16),
-                child: isLoadingPost
-                    ? Center(
-                        child: CircularProgressIndicator(),
-                      )
+                child: myProfile == null
+                    ? const Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(
                         controller: scrollController,
                         child: Column(
@@ -496,7 +489,10 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                     ],
                                   ),
                                   TextButton.icon(
-                                    onPressed: () => pickimage(context),
+                                    onPressed: () => CreatePost.show(context,
+                                        isGroupPost: false,
+                                        isPost: true,
+                                        myGroupId: myGroup!.groupId),
                                     style: TextButton.styleFrom(
                                       backgroundColor: Colors.blue,
                                       shape: RoundedRectangleBorder(
@@ -515,13 +511,93 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 10),
-                              child: Text(
-                                "${myProfile?['bio'] ?? 'No bio available'}",
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.background,
-                                    fontFamily: "Poppins"),
-                                textAlign: TextAlign.left,
+                              child: GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      final bioList = myProfile?['bio'] ?? [];
+                                      bioList.removeWhere((bio) => bio == null);
+                                      return AlertDialog(
+                                        backgroundColor: AppColors.background,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(20)),
+                                        title: Row(
+                                          children: [
+                                            Icon(Icons.info_outline,
+                                                color: AppColors.textSecondary),
+                                            SizedBox(width: 8),
+                                            Text('Bio History',
+                                                style: TextStyle(
+                                                    fontFamily: "Poppins",
+                                                    color: AppColors.primary)),
+                                          ],
+                                        ),
+                                        content: bioList.isEmpty
+                                            ? Text("No bio available.",
+                                                style: TextStyle(
+                                                    fontFamily: "Poppins",
+                                                    color: AppColors.success))
+                                            : SizedBox(
+                                                width: double.maxFinite,
+                                                child: ListView.separated(
+                                                  shrinkWrap: true,
+                                                  itemCount: bioList.length,
+                                                  separatorBuilder: (_, __) =>
+                                                      Divider(),
+                                                  itemBuilder: (context, idx) {
+                                                    final bioObj =
+                                                        GroupsService.parseBio(
+                                                            bioList[idx]);
+                                                    return ListTile(
+                                                      title: Text(
+                                                        bioObj.bio ?? "No bio",
+                                                        style: TextStyle(
+                                                            fontFamily:
+                                                                "Poppins",
+                                                            color:
+                                                                Colors.white),
+                                                      ),
+                                                      subtitle: Text(
+                                                        "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Colors.grey[700],
+                                                          fontFamily: "Poppins",
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                        actions: [
+                                          TextButton(
+                                            child: Text('Close',
+                                                style: TextStyle(
+                                                    fontFamily: "Poppins",
+                                                    color: AppColors.primary)),
+                                            onPressed: () =>
+                                                Navigator.of(context).pop(),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                                child: Text(
+                                  myProfile?['bio'].length > 0 &&
+                                          !(myProfile?['bio'] as List)
+                                              .every((bio) => bio == null)
+                                      ? "#${GroupsService.parseBio(myProfile?['bio'].last).editedBy} ${GroupsService.parseBio(myProfile?['bio'].last).bio}"
+                                      : 'No bio available',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.background,
+                                      fontFamily: "Poppins"),
+                                  textAlign: TextAlign.left,
+                                ),
                               ),
                             ),
                             Divider(
@@ -545,7 +621,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                               ),
                             ),
                             SizedBox(height: 10),
-                            if (posts.isEmpty)
+                            if (posts.isEmpty && !isLoadingPost)
                               Center(
                                 child: Text("You Didn't Post Yet 😔",
                                     style: TextStyle(
@@ -573,6 +649,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                   }
                                   try {
                                     return DynamicPostWidget(
+                                      borderRadius: 12,
                                       content: post['content'],
                                       media: List<Map<String, dynamic>>.from(
                                           (post['media'] as List<dynamic>)
@@ -585,6 +662,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                       group: post['group'],
                                       authorName: post['authorName'],
                                       profilePic: post['profilePic'],
+                                      likes: post['likes'],
                                     );
                                   } on Exception catch (e) {
                                     return Container();
@@ -598,6 +676,12 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                   // );
                                 },
                               ),
+                            if (isLoadingPost) ...[
+                              Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              SizedBox(height: 10),
+                            ]
                           ],
                         ),
                       ),

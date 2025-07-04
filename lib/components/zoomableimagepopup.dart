@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -79,6 +81,8 @@ class _ZoomableImagePopupState extends State<ZoomableImagePopup>
     _animationController.forward(from: 0);
   }
 
+  bool isUrl(String s) => Uri.tryParse(s)?.isAbsolute ?? false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,10 +102,16 @@ class _ZoomableImagePopupState extends State<ZoomableImagePopup>
                 child: Center(
                   child: Hero(
                     tag: widget.imageUrl,
-                    child: CachedNetworkImage(
-                      imageUrl: widget.imageUrl,
-                      fit: BoxFit.contain,
-                    ),
+                    child: (() {
+                      if (isUrl(widget.imageUrl)) {
+                        return CachedNetworkImage(
+                          imageUrl: widget.imageUrl,
+                          fit: BoxFit.contain,
+                        );
+                      } else {
+                        return Image.file(File(widget.imageUrl));
+                      }
+                    }()),
                   ),
                 ),
               ),

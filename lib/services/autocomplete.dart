@@ -40,3 +40,21 @@ Future<List<Map<String, dynamic>>> autocompleteUniversity(String q) async {
     return [];
   }
 }
+
+Future<List<Map<String, dynamic>>> autocompletecollege(String q) async {
+  print("baseurl: $baseurl");
+  try {
+    final response =
+        await http.get(Uri.parse('$baseurl/autocomplete/college?q=$q'));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      throw Exception('Failed to load APIs: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Error fetching APIs: $e');
+    return [];
+  }
+}

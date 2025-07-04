@@ -13,8 +13,6 @@ class GroupsService {
   static String baseurl =
       AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
   //String? token = await UserService.getAccessToken();
-  static String? token =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsInVzZXJJZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsImVtYWlsIjoicHJhbmF2XzYwNUBleGFtcGxlLmNvbSIsInByb2ZpbGVQaWMiOiJodHRwczovL3JhbmRvbXVzZXIubWUvYXBpL3BvcnRyYWl0cy9tZW4vNTMuanBnP25hdD1pbiIsIm5hbWUiOiJQcmFuYXYiLCJ1c2VybmFtZSI6InByYW5hdl82MDUiLCJiaW8iOiJIaSwgSSdtIFByYW5hdi4gRXhjaXRlZCB0byBjb25uZWN0ISIsImVkdWNhdGlvbkxldmVsIjoiVW5pdmVyc2l0eSIsInVuaXZlcnNpdHkiOiJCYW5hcmFzIEhpbmR1IFVuaXZlcnNpdHkiLCJjb2xsZWdlIjoiSGluZHUgQ29sbGVnZSIsInNjaG9vbCI6Ik5hdm9kYXlhIFZpZHlhbGF5YSIsInNlbWVzdGVyIjoiU2VtIDIiLCJ1c2VyQ2xhc3MiOm51bGwsInllYXIiOm51bGwsImJpcnRoZGF5IjoiMjAwNS0wOS0wMlQxODozMDowMC4wMDBaIiwiZGJJbmRleCI6MCwiaWF0IjoxNzMyMjA2NzE3fQ.RnRHKaY82lze39GppuXsJHxWphfpA8sFkQXKUGCm5OA";
 
 // Function to build FriendCircleGroup from JSON or object
   static FriendCircleGroup buildFriendCircleGroup(
@@ -51,8 +49,7 @@ class GroupsService {
   }
 
   static Future<List<FriendCircleGroup>> getRecommendedGroups() async {
-    String? token =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsInVzZXJJZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsImVtYWlsIjoicHJhbmF2XzYwNUBleGFtcGxlLmNvbSIsInByb2ZpbGVQaWMiOiJodHRwczovL3JhbmRvbXVzZXIubWUvYXBpL3BvcnRyYWl0cy9tZW4vNTMuanBnP25hdD1pbiIsIm5hbWUiOiJQcmFuYXYiLCJ1c2VybmFtZSI6InByYW5hdl82MDUiLCJiaW8iOiJIaSwgSSdtIFByYW5hdi4gRXhjaXRlZCB0byBjb25uZWN0ISIsImVkdWNhdGlvbkxldmVsIjoiVW5pdmVyc2l0eSIsInVuaXZlcnNpdHkiOiJCYW5hcmFzIEhpbmR1IFVuaXZlcnNpdHkiLCJjb2xsZWdlIjoiSGluZHUgQ29sbGVnZSIsInNjaG9vbCI6Ik5hdm9kYXlhIFZpZHlhbGF5YSIsInNlbWVzdGVyIjoiU2VtIDIiLCJ1c2VyQ2xhc3MiOm51bGwsInllYXIiOm51bGwsImJpcnRoZGF5IjoiMjAwNS0wOS0wMlQxODozMDowMC4wMDBaIiwiZGJJbmRleCI6MCwiaWF0IjoxNzMyMjA2NzE3fQ.RnRHKaY82lze39GppuXsJHxWphfpA8sFkQXKUGCm5OA";
+    String? token = await UserService.getAccessToken();
 
     final response = await http.get(
       Uri.parse('$baseurl/recommend/groups'),
@@ -106,17 +103,18 @@ class GroupsService {
     }
   }
 
-  static Future<List<FriendCircleGroup>> getGroupDetaills(
+  static Future<List<FriendCircleGroup>> getGroupDetails(
       {required String gid}) async {
     final response = await http.get(
-      Uri.parse('$baseurl//group/details/$gid'),
+      Uri.parse('$baseurl/group/details/$gid'),
       headers: {
         "content-type": "application/json",
       },
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
+      final Map<String, dynamic> _Responsedata = json.decode(response.body);
+      final List<dynamic> data = _Responsedata['group'];
       print(data);
       return data.map((item) {
         // Parsing individual group
@@ -165,6 +163,7 @@ class GroupsService {
   ) async {
     try {
       final url = Uri.parse('$baseurl/groups');
+      String? token = await UserService.getAccessToken();
 
       final response = await http.post(
         url,
@@ -200,6 +199,7 @@ class GroupsService {
       required int dbIndex}) async {
     try {
       final url = Uri.parse('$baseurl/groups');
+      String? token = await UserService.getAccessToken();
 
       final response = await http.put(
         url,
@@ -232,11 +232,63 @@ class GroupsService {
     }
   }
 
+  static UserBio parseBio(String fullBio) {
+    const delimiter = '\u2063'; // INVISIBLE SEPARATOR
+    final parts = fullBio.split(delimiter);
+
+    final cleanBio = parts.isNotEmpty ? parts[0] : '';
+    final editedBy = (parts.length > 1 &&
+            parts[1].startsWith('<!--u:') &&
+            parts[1].endsWith('-->'))
+        ? parts[1].replaceAll(RegExp(r'<!--u:|-->'), '')
+        : '';
+
+    return UserBio(
+      bio: cleanBio,
+      editedBy: editedBy,
+    );
+  }
+
+  static Future<Map<String, dynamic>> updateMemberBio(
+      {String? bio, required String groupId, required String userId}) async {
+    try {
+      final url = Uri.parse('$baseurl/groups/bio/$groupId');
+      String? token = await UserService.getAccessToken();
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'bio': bio,
+          "userId": userId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        await UserService.fetchMyProfile();
+
+        return {'success': true, 'data': jsonDecode(response.body)};
+      } else {
+        return {
+          'success': false,
+          'error':
+              jsonDecode(response.body)['message'] ?? 'Unknown error occurred',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   static Future<Map<String, dynamic>> joinGroup(
     String groupId,
   ) async {
     try {
       final url = Uri.parse('$baseurl/groups/join/$groupId');
+      String? token = await UserService.getAccessToken();
 
       final response = await http.post(
         url,
@@ -266,6 +318,7 @@ class GroupsService {
     try {
       final url = Uri.parse('$baseurl/groups/leave/$groupId');
 
+      String? token = await UserService.getAccessToken();
       final response = await http.post(
         url,
         headers: {
@@ -293,7 +346,7 @@ class GroupsService {
   ) async {
     try {
       final url = Uri.parse('$baseurl/watchlist/$groupId');
-
+      String? token = await UserService.getAccessToken();
       final response = await http.post(
         url,
         headers: {
@@ -321,6 +374,7 @@ class GroupsService {
   ) async {
     try {
       final url = Uri.parse('$baseurl/watchlist/$groupId');
+      String? token = await UserService.getAccessToken();
 
       final response = await http.delete(
         url,
@@ -342,5 +396,18 @@ class GroupsService {
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
+  }
+}
+
+class UserBio {
+  String? bio;
+  String? editedBy;
+
+  UserBio({this.bio, this.editedBy});
+  factory UserBio.fromJson(Map<String, dynamic> json) {
+    return UserBio(
+      bio: json['bio'],
+      editedBy: json['editedBy'],
+    );
   }
 }

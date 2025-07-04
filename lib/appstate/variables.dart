@@ -49,9 +49,11 @@ class AppVariables {
   }
 
   static void update(String key, dynamic value) {
-    _variables[key] = value;
-    _notifyListeners(key, value);
-    _notifyUIUpdateCallbacks();
+    try {
+      _variables[key] = value;
+      _notifyListeners(key, value);
+      _notifyUIUpdateCallbacks();
+    } on Exception catch (e) {}
   }
 
   static void addListener<T>(String key, Function(T) listener) {

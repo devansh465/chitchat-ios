@@ -26,6 +26,26 @@ class FriendCircleGroup {
     required this.groupId,
     this.groupData = const {},
   });
+
+  FriendCircleGroup copyWith({
+    List<FriendCircleMember>? members,
+    String? groupId,
+    Map<String, dynamic>? groupData,
+  }) {
+    return FriendCircleGroup(
+      members: members ?? this.members,
+      groupId: groupId ?? this.groupId,
+      groupData: groupData ?? this.groupData,
+    );
+  }
+
+  FriendCircleGroup copy() {
+    return FriendCircleGroup(
+      members: members,
+      groupId: groupId,
+      groupData: groupData,
+    );
+  }
 }
 
 // Layout widget for multiple friend circles
@@ -120,6 +140,11 @@ class FriendCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final total = min(group.members.length, maxVisibleMembers);
+
+    // ✅ Create a single shuffled index list once
+    final shuffledIndices = List.generate(total, (idx) => idx)..shuffle();
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -136,13 +161,16 @@ class FriendCircle extends StatelessWidget {
               CustomPaint(
                 size: Size(size, size),
                 painter: OuterEdgePainter(
-                  memberCount: group.members.length.clamp(0, maxVisibleMembers),
+                  memberCount: total,
                   edgeStyle: edgeStyle,
                 ),
               ),
+              // ✅ Use the single shuffledIndices list
               ...List.generate(
-                min(group.members.length, maxVisibleMembers),
-                (index) => _buildNode(index),
+                total,
+                (i) {
+                  return _buildNode(i);
+                },
               ),
               if (group.members.length > maxVisibleMembers)
                 _buildExtraCountNode(),
@@ -288,6 +316,8 @@ class OuterEdgePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    //Fix memberCount so it always show a full circle
+    int memberCount = 10;
     if (memberCount < 2) return;
 
     final center = Offset(size.width / 2, size.height / 2);
