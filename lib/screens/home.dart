@@ -591,12 +591,8 @@ class _HomePageState extends State<HomePage> {
               _buildNavItem(Icons.home_rounded, 0, onPressed: () {
                 _loadMoreItems(invalidate: "true");
                 _getStories();
-                AppVariables.update("selectedTabIndex", 0);
-                print(AppVariables.get<int>("selectedTabIndex"));
               }),
               _buildNavItem(Icons.search_rounded, 1, onPressed: () {
-                AppVariables.update("selectedTabIndex", 1);
-                print(AppVariables.get<int>("selectedTabIndex"));
                 Navigator.push(
                   context,
                   PageTransition(
@@ -610,8 +606,6 @@ class _HomePageState extends State<HomePage> {
               }),
               const SizedBox(width: 30),
               _buildNavItem(Icons.favorite_rounded, 2, onPressed: () {
-                AppVariables.update("selectedTabIndex", 2);
-                print(AppVariables.get<int>("selectedTabIndex"));
                 Navigator.push(
                   context,
                   PageTransition(
@@ -643,7 +637,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildNavItem(IconData icon, int index, {Function()? onPressed}) {
-    bool isSelected = AppVariables.get<int>("selectedTabIndex") == index;
+    bool isSelected = index == 0;
 
     return IconButton(
       icon: Icon(
@@ -748,6 +742,8 @@ class _HomePageState extends State<HomePage> {
               child: child,
             ),
             child: DynamicPostWidget(
+              showAuthor: false,
+              showCount: true,
               borderRadius: 12,
               content: post['content'],
               media: List<Map<String, dynamic>>.from(

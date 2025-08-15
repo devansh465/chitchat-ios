@@ -142,6 +142,9 @@ class PostService {
     }
   }
 
+
+  
+
   static Future<Map<String, dynamic>> createPost(
       {required List<String> files,
       required bool isGroupPost,
@@ -199,6 +202,71 @@ class PostService {
       };
     }
   }
+
+  static Future<Map<String, dynamic>?> fetchRelatedPosts({
+    required String postId,
+    int limit = 10,
+    String? groupPostsCursor,
+    String? memberPostsCursor,
+    String? authorPostsCursor,
+  }) async {
+    try {
+      // Build query parameters
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+      };
+
+      if (groupPostsCursor != null) {
+        queryParams['groupPostsCursor'] = groupPostsCursor;
+      }
+      if (memberPostsCursor != null) {
+        queryParams['memberPostsCursor'] = memberPostsCursor;
+      }
+      if (authorPostsCursor != null) {
+        queryParams['authorPostsCursor'] = authorPostsCursor;
+      }
+
+      final uri = Uri.parse('$baseurl/posts/$postId/related')
+          .replace(queryParameters: queryParams);
+      String? token = await UserService.getAccessToken();
+          if (token == null) {
+        return {
+          "success": false,
+          "error": "User not authenticated",
+        };
+      }
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+           'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "data": json.decode(response.body),
+        };
+      } else {
+        print('Failed to load posts: ${response.statusCode}');
+        return {
+           "success": false,
+          "error": "Failed to fetch posts",
+        };
+      }
+    } catch (e) {
+      print('Network error: $e');
+        return {
+           "success": false,
+          "error": e.toString(),
+        };
+    }
+  }
+
+
+
+
 
   static Future<Map<String, dynamic>> toggleLikeOnPost(String postId) async {
     try {

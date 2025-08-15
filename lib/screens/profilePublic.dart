@@ -9,6 +9,7 @@ import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
+import 'package:chitchat/screens/groupPublic.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
@@ -31,12 +32,16 @@ class PublicProfilePage extends StatefulWidget {
   State<PublicProfilePage> createState() => _PublicProfilePageState();
 }
 
-class _PublicProfilePageState extends State<PublicProfilePage> {
+class _PublicProfilePageState extends State<PublicProfilePage>
+    with TickerProviderStateMixin {
   FriendCircleGroup? userGroup;
   Map<String, dynamic>? userProfile;
   Map<String, dynamic>? myProfile;
 
   final ScrollController _scrollController = ScrollController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+
   List<dynamic> posts = [];
   String? next;
   bool isLoadingPost = false;
@@ -47,12 +52,53 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   bool isWatchListLoading = false;
   bool isJoinLoading = false;
 
+  // Animation variables for FriendCircle
+  late AnimationController _friendCircleAnimationController;
+  late Animation<int> _maxVisibleAnimation;
+  late Animation<double> _upperContainerHeightAnimation;
+  late Animation<int> _circleSizeAnimation;
+  int currentMaxVisible = 4; // Initial max visible users
+  double currentUpperContainerHeightMultiplier = 0.4;
+  int currentCircleSize = 200;
+
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+
+    // Initialize animation controller
+    _friendCircleAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _maxVisibleAnimation = IntTween(
+      begin: 4,
+      end: 6, // Maximum users to show
+    ).animate(CurvedAnimation(
+      parent: _friendCircleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _upperContainerHeightAnimation = Tween<double>(
+      begin: 0.4,
+      end: 0.7,
+    ).animate(CurvedAnimation(
+      parent: _friendCircleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _circleSizeAnimation = IntTween(
+      begin: 200,
+      end: 350,
+    ).animate(CurvedAnimation(
+      parent: _friendCircleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
     _getprofile();
     _fetchPosts();
+
+    // Listen to scroll changes
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 100 &&
@@ -61,6 +107,39 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         _fetchPosts();
       }
     });
+
+    // Listen to sheet drag changes
+    _sheetController.addListener(_onSheetPositionChanged);
+  }
+
+  void _onSheetPositionChanged() {
+    if (!_sheetController.isAttached) return;
+
+    final double currentPosition = _sheetController.size;
+
+    // Calculate progress based on sheet position
+    // When sheet is at 0.6 (initial), progress = 0
+    // When sheet is at 1.0 (fully expanded), progress = 1
+    final double progress =
+        ((0.6 - currentPosition) / (0.6 - 0.2)).clamp(0.0, 1.0);
+
+    // Update animation progress
+    _friendCircleAnimationController.value = progress;
+    // Update current max visible based on animation
+    setState(() {
+      currentMaxVisible = _maxVisibleAnimation.value;
+      currentUpperContainerHeightMultiplier =
+          _upperContainerHeightAnimation.value;
+      currentCircleSize = _circleSizeAnimation.value;
+    });
+  }
+
+  @override
+  void dispose() {
+    _friendCircleAnimationController.dispose();
+    _sheetController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   _getprofile() async {
@@ -167,75 +246,175 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         children: [
           // Top Container for Friend Circle
           Container(
-            height: MediaQuery.of(context).size.height * 0.3,
-            child: Center(
-              child: userGroup == null
-                  ? CircularProgressIndicator() // Show a loader until the group is available
-                  : userGroup!.members.length == 0
-                      ? Center(
-                          child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "😔 No Groups Found ",
-                              style: TextStyle(
-                                  fontSize: 25,
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ],
-                        ))
-                      : FriendCircle(
-                          group: userGroup!,
-                          size: 200,
-                          nodeSize: (userGroup!.members.length > 5
-                              ? userGroup!.members.length * 10.0
-                              : 90.0),
-                          nodeBorderColor: Colors.white24,
-                          edgeStyle: EdgeStyle(
-                            width: 2,
-                            outerGlow: 2,
-                            outerGlowColor: Colors.white,
-                            gradientColors: [
-                              Color.fromARGB(255, 198, 101, 10),
-                              Color.fromARGB(255, 255, 179, 0),
-                              Color.fromARGB(255, 96, 4, 194)
-                            ],
-                          ),
-                          onGroupTap: () {
-                            print("Group tapped! ${userGroup!.groupId}");
-                            Navigator.push(
-                              context,
-                              PageTransition(
-                                type: PageTransitionType.rightToLeft,
-                                child: GroupPrivateViewScreen(),
-                              ),
-                            );
-                          },
-                          onMemberTap: (index) {
-                            if (index < userGroup!.members.length) {
-                              print(
-                                  "Member ${userGroup!.members[index].id} tapped!");
-                              Navigator.push(
-                                context,
-                                PageTransition(
-                                  type: PageTransitionType.rightToLeft,
-                                  child: GroupPrivateViewScreen(),
+            height: MediaQuery.of(context).size.height *
+                currentUpperContainerHeightMultiplier,
+            child: Column(
+              children: [
+                Center(
+                  child: userGroup == null
+                      ? CircularProgressIndicator() // Show a loader until the group is available
+                      : userGroup!.members.length == 0
+                          ? Center(
+                              child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "😔 No Groups Found ",
+                                  style: TextStyle(
+                                      fontSize: 25,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white),
                                 ),
-                              );
-                            } else {
-                              print("Invalid member tapped!");
-                            }
-                          },
+                              ],
+                            ))
+                          : AnimatedBuilder(
+                              animation: _maxVisibleAnimation,
+                              builder: (context, child) {
+                                return FriendCircle(
+                                  group: userGroup!,
+                                  size: currentCircleSize * 1.0,
+                                  nodeSize: (userGroup!.members.length > 5
+                                      ? userGroup!.members.length *
+                                          currentUpperContainerHeightMultiplier *
+                                          15
+                                      : 90.0),
+                                  nodeBorderColor: Colors.white24,
+                                  maxVisibleMembers: currentMaxVisible,
+                                  edgeStyle: EdgeStyle(
+                                    width: 2,
+                                    outerGlow: 2,
+                                    outerGlowColor: Colors.white,
+                                    gradientColors: [
+                                      Color.fromARGB(255, 198, 101, 10),
+                                      Color.fromARGB(255, 255, 179, 0),
+                                      Color.fromARGB(255, 96, 4, 194)
+                                    ],
+                                  ),
+                                  onGroupTap: () {
+                                    print(
+                                        "Group tapped! ${userGroup!.groupId}");
+                                    Navigator.push(
+                                      context,
+                                      PageTransition(
+                                        type: PageTransitionType.rightToLeft,
+                                        child: GroupPublicViewScreen(
+                                          groupId: userGroup!.groupId,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  onMemberTap: (index) {
+                                    if (index < userGroup!.members.length) {
+                                      print(
+                                          "Member ${userGroup!.members[index].id} tapped!");
+                                      Navigator.push(
+                                        context,
+                                        PageTransition(
+                                          type: PageTransitionType.rightToLeft,
+                                          child: GroupPublicViewScreen(
+                                            groupId: userGroup!.groupId,
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      print("Invalid member tapped!");
+                                    }
+                                  },
+                                );
+                              },
+                            ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () async {
+                          // Handle the "Join" button press
+                          setState(() {
+                            isJoinLoading = true;
+                          });
+
+                          Map<String, dynamic> result =
+                              await GroupsService.joinGroup(userGroup!.groupId);
+                          setState(() {
+                            isJoinLoading = false;
+                          });
+                          if (result['success']) {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: Text('Success'),
+                                  content:
+                                      Text("🚀Group Joined successfully 🎉🎉"),
+                                  actions: [
+                                    TextButton(
+                                      child: Text('OK'),
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: Text('Error',
+                                      style: TextStyle(
+                                          color: AppColors.background,
+                                          fontFamily: "Poppins")),
+                                  content: Text(
+                                      "Failed to join group😔\n${result['error']}",
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontFamily: "Poppins")),
+                                  actions: [
+                                    TextButton(
+                                      child: Text('OK'),
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
+                        icon: isJoinLoading
+                            ? CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : Icon(Icons.add, color: Colors.white),
+                        label: Text(isJoinLoading ? "Joining..." : "Join Group",
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           // DraggableScrollableSheet for the Bottom Container
           DraggableScrollableSheet(
-            initialChildSize: 0.6, // Default open height (50% of the screen)
-            minChildSize: 0.6, // Minimum height (cannot be dragged below 50%)
-            maxChildSize: 1, // Maximum height (90% of the screen)
+            controller: _sheetController,
+            initialChildSize: 0.6, // Default open height (60% of the screen)
+            minChildSize: 0.2, // Minimum height (cannot be dragged below 20%)
+            maxChildSize: 1, // Maximum height (100% of the screen)
             builder: (context, scrollController) {
               scrollController.addListener(() {
                 if (scrollController.position.pixels >=
@@ -316,91 +495,6 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                                         "${userProfile?['name'] ?? 'No Name'}",
                                         style: TextStyle(
                                             fontSize: 16, color: Colors.grey),
-                                      ),
-                                      TextButton.icon(
-                                        onPressed: () async {
-                                          // Handle the "Join" button press
-                                          setState(() {
-                                            isJoinLoading = true;
-                                          });
-
-                                          Map<String, dynamic> result =
-                                              await GroupsService.joinGroup(
-                                                  userGroup!.groupId);
-                                          setState(() {
-                                            isJoinLoading = false;
-                                          });
-                                          if (result['success']) {
-                                            showDialog(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return AlertDialog(
-                                                  title: Text('Success'),
-                                                  content: Text(
-                                                      "🚀Group Joined successfully 🎉🎉"),
-                                                  actions: [
-                                                    TextButton(
-                                                      child: Text('OK'),
-                                                      onPressed: () {
-                                                        Navigator.of(context)
-                                                            .pop();
-                                                      },
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            );
-                                          } else {
-                                            showDialog(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return AlertDialog(
-                                                  title: Text('Error',
-                                                      style: TextStyle(
-                                                          color: AppColors
-                                                              .background,
-                                                          fontFamily:
-                                                              "Poppins")),
-                                                  content: Text(
-                                                      "Failed to join group😔\n${result['error']}",
-                                                      style: TextStyle(
-                                                          color: Colors.red,
-                                                          fontFamily:
-                                                              "Poppins")),
-                                                  actions: [
-                                                    TextButton(
-                                                      child: Text('OK'),
-                                                      onPressed: () {
-                                                        Navigator.of(context)
-                                                            .pop();
-                                                      },
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            );
-                                          }
-                                        },
-                                        style: TextButton.styleFrom(
-                                          backgroundColor: Colors.blue,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                          ),
-                                        ),
-                                        icon: isJoinLoading
-                                            ? CircularProgressIndicator(
-                                                color: Colors.white,
-                                              )
-                                            : Icon(Icons.add,
-                                                color: Colors.white),
-                                        label: Text(
-                                            isJoinLoading
-                                                ? "Joining..."
-                                                : "Join Group",
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.white)),
                                       ),
                                     ],
                                   ),

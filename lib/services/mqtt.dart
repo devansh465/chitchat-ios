@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:chitchat/services/chats.dart';
 import 'package:event_handeler/event_handeler.dart';
 import 'package:mqtt_client/mqtt_client.dart';
@@ -80,15 +82,19 @@ class MQTTService {
         final recMess = c![0].payload as MqttPublishMessage;
         final String _topic = c[0].topic;
 
-        final message =
-            MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
-        final senderClientId = _topic.split('/').last;
+        try {
+          final payloadBytes = recMess.payload.message;
+          final message = utf8.decode(payloadBytes); // 🔥 FIX HERE
+          final senderClientId = _topic.split('/').last;
 
-        if (senderClientId != clientId) {
-          print('📩 Message received: $message from $_topic');
-          await ChatServices.incrementMessageNotificationCount();
-          dispatchCustomEvent(0, "messageNotificationCountUpdate");
-          onMessageReceived(message);
+          if (senderClientId != clientId) {
+            print('📩 Message received: $message from $_topic');
+            await ChatServices.incrementMessageNotificationCount();
+            dispatchCustomEvent(0, "messageNotificationCountUpdate");
+            onMessageReceived(message);
+          }
+        } catch (e) {
+          print('🚨 Failed to decode message: $e');
         }
       });
     } catch (e) {
@@ -109,7 +115,7 @@ class MQTTService {
       _client!.connectionStatus!.state == MqttConnectionState.connected;
 
   void publish(String message) {
-    final builder = MqttClientPayloadBuilder()..addString(message);
+    final builder = MqttClientPayloadBuilder()..addUTF8String(message);
     if (topic == null) {
       print('Topic is not set. Please set a topic before publishing.');
       throw Exception(

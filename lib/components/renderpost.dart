@@ -7,7 +7,9 @@ import 'package:chitchat/appstate/store.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/like.dart';
+import 'package:chitchat/components/relatedpost.dart';
 import 'package:chitchat/components/simpleaudioplayer.dart';
+import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/services/fileUploader.dart';
@@ -29,18 +31,21 @@ class DynamicPostWidget extends StatefulWidget {
   final String? profilePic;
   final double borderRadius;
   final int likes;
+  final bool? showAuthor;
+  final bool? showCount;
 
-  DynamicPostWidget({
-    required this.content,
-    required this.media,
-    required this.postId,
-    required this.author,
-    required this.group,
-    this.authorName,
-    this.profilePic,
-    this.borderRadius = 12,
-    this.likes = 0,
-  });
+  DynamicPostWidget(
+      {required this.content,
+      required this.media,
+      required this.postId,
+      required this.author,
+      required this.group,
+      this.authorName,
+      this.profilePic,
+      this.borderRadius = 12,
+      this.likes = 0,
+      this.showAuthor = false,
+      this.showCount = false});
 
   @override
   State<DynamicPostWidget> createState() => _DynamicPostWidgetState();
@@ -94,9 +99,9 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
               return AlertDialog(
                 title: Column(
                   children: [
-                    Text(
+                    const Text(
                       'Uploading image...',
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -104,9 +109,9 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                     ),
                     const SizedBox(height: 10),
                     if (showErrorText)
-                      Text(
+                      const Text(
                         'Do not close this dialog until the upload is complete.',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: Colors.red,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -332,6 +337,185 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
 
   // Open BottomSheet with media slider
   void _openBottomSheet(BuildContext context) {
+    int mediaIndex = 1;
+
+    showModalBottomSheet(
+      enableDrag: true,
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: DraggableScrollableSheet(
+              initialChildSize: 0.9,
+              minChildSize: 0.3,
+              maxChildSize: 1,
+              builder: (context, scrollController) {
+                var commentController = TextEditingController();
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    children: [
+                      // Drag handle
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        height: 4,
+                        width: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      // Main content
+                      Expanded(
+                        child: CustomScrollView(
+                          controller: scrollController,
+                          slivers: [
+                            // Collapsible media section
+                            SliverAppBar(
+                              backgroundColor: Colors.transparent,
+                              pinned: true,
+                              expandedHeight: 400,
+                              automaticallyImplyLeading: false,
+                              flexibleSpace: FlexibleSpaceBar(
+                                background: PageView.builder(
+                                  onPageChanged: (value) {
+                                    setState(() {
+                                      mediaIndex = value + 1;
+                                    });
+                                  },
+                                  itemCount: widget.media.length,
+                                  itemBuilder: (context, index) {
+                                    return GestureDetector(
+                                      child: _buildMediaContent(
+                                          widget.media[index]),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            SliverToBoxAdapter(
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: LikeButton(
+                                          buttonType: ButtonType.post,
+                                          postId: widget.postId,
+                                          initialLikes: widget.likes,
+                                          initiallyLiked: false,
+                                          onLikeChanged: (isLiked) async {
+                                            Map<String, dynamic> result =
+                                                await PostService
+                                                    .toggleLikeOnPost(
+                                                        widget.postId);
+                                            if (result["success"] && mounted) {
+                                              setState(() {
+                                                // Update the like count and state based on the result
+                                              });
+                                              return true;
+                                            } else {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(SnackBar(
+                                                      content: Text(
+                                                          result["message"])));
+                                              return false;
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Row(
+                                          children: [
+                                            const Icon(Icons.comment,
+                                                color: Colors.white),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              comments.length.toString(),
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14),
+                                            ),
+                                          ],
+                                        ),
+                                        onPressed: () =>
+                                            _openCommentSheet(context),
+                                      ),
+                                    ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(
+                                      mediaIndex == widget.media.length
+                                          ? ""
+                                          : "$mediaIndex/${widget.media.length}",
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SliverToBoxAdapter(
+                              child: Container(
+                                height: 60,
+                                child: const Center(
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.explore),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            "Explore",
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14),
+                                          ),
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            RelatedPostsWidget(
+                                postId: widget.postId,
+                                scrollController: scrollController),
+                          ],
+                        ),
+                      ),
+                      // Fixed comment input at bottom
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  // Open BottomSheet with media slider
+  void _openCommentSheet(BuildContext context) {
     StreamSubscription? subscription;
     int mediaIndex = 1;
     bool isCommenting = false;
@@ -363,7 +547,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
             child: DraggableScrollableSheet(
               initialChildSize: 0.9,
               minChildSize: 0.3,
-              maxChildSize: 0.95,
+              maxChildSize: 1,
               builder: (context, scrollController) {
                 var commentController = TextEditingController();
                 return Container(
@@ -397,76 +581,10 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                           child: CustomScrollView(
                             controller: scrollController,
                             slivers: [
-                              // Collapsible media section
-                              SliverAppBar(
-                                backgroundColor: Colors.transparent,
-                                pinned: true,
-                                expandedHeight: 400,
-                                automaticallyImplyLeading: false,
-                                flexibleSpace: FlexibleSpaceBar(
-                                  background: PageView.builder(
-                                    onPageChanged: (value) {
-                                      setState(() {
-                                        mediaIndex = value + 1;
-                                      });
-                                    },
-                                    itemCount: widget.media.length,
-                                    itemBuilder: (context, index) {
-                                      return GestureDetector(
-                                        child: _buildMediaContent(
-                                            widget.media[index]),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
                               // Comments list
-                              SliverToBoxAdapter(
+                              const SliverToBoxAdapter(
                                   child: Column(
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: LikeButton(
-                                          buttonType: ButtonType.post,
-                                          postId: widget.postId,
-                                          initialLikes: widget.likes,
-                                          initiallyLiked: false,
-                                          onLikeChanged: (isLiked) async {
-                                            Map<String, dynamic> result =
-                                                await PostService
-                                                    .toggleLikeOnPost(
-                                                        widget.postId);
-                                            if (result["success"] && mounted) {
-                                              setState(() {
-                                                // Update the like count and state based on the result
-                                              });
-                                              return true;
-                                            } else {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(SnackBar(
-                                                      content: Text(
-                                                          result["message"])));
-                                              return false;
-                                            }
-                                          },
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text(
-                                          "$mediaIndex/${widget.media.length}",
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                   Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
@@ -490,7 +608,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                       child: Container(
                                         margin: const EdgeInsets.symmetric(
                                             vertical: 100),
-                                        child: Center(
+                                        child: const Center(
                                           child: Text('No comments yet',
                                               style: TextStyle(
                                                   fontSize: 16,
@@ -585,7 +703,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                   child: Container(
                                     margin:
                                         const EdgeInsets.symmetric(vertical: 1),
-                                    child: Center(
+                                    child: const Center(
                                       child: CircularProgressIndicator(
                                         color: Colors.white,
                                       ),
@@ -709,7 +827,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                               ),
                             ),
                             isCommenting
-                                ? CircularProgressIndicator()
+                                ? const CircularProgressIndicator()
                                 : IconButton(
                                     icon: const Icon(Icons.send,
                                         color: AppColors.success),
@@ -787,94 +905,108 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
         borderRadius: BorderRadius.circular(widget.borderRadius),
         child: Stack(
           children: [
-            CachedNetworkImage(
-                imageUrl: widget.media[0]['url'] ?? '',
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
+            if (widget.media.first['type'] == 'video')
+              FittedBox(
+                child: VideoMessageView(
+                  url: widget.media[0]['url'] ?? '',
+                  onTap: () => _openBottomSheet(context),
+                ),
+              )
+            else
+              CachedNetworkImage(
+                  imageUrl: widget.media[0]['url'] ?? '',
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                        height: 200,
+                        color: const Color(0xFF2A2A2A),
+                      ),
+                  errorWidget: (context, url, error) => Container(
                       height: 200,
                       color: const Color(0xFF2A2A2A),
-                    ),
-                errorWidget: (context, url, error) => Container(
-                    height: 200,
-                    color: const Color(0xFF2A2A2A),
-                    child: const Center(
-                      child: Icon(Icons.error),
-                    ))),
-            Positioned(
-                top: 5,
-                left: 5,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(20),
+                      child: const Center(
+                        child: Icon(Icons.error),
+                      ))),
+            if (widget.showAuthor != null && widget.showAuthor == true)
+              Positioned(
+                  top: 5,
+                  left: 5,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 10,
+                              backgroundImage: widget.profilePic != null
+                                  ? CachedNetworkImageProvider(
+                                      widget.profilePic!)
+                                  : null,
+                              child: widget.profilePic != null
+                                  ? null
+                                  : const Icon(Icons.person,
+                                      size: 15, color: Colors.white),
+                            ),
+                            const SizedBox(width: 10),
+                            Text('${widget.authorName ?? ""}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        offset: const Offset(0, 1),
+                                        blurRadius: 3.0,
+                                        color: Colors.black.withOpacity(0.5),
+                                      ),
+                                    ])),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 10,
-                            backgroundImage: widget.profilePic != null
-                                ? CachedNetworkImageProvider(widget.profilePic!)
-                                : null,
-                            child: widget.profilePic != null
-                                ? null
-                                : const Icon(Icons.person,
-                                    size: 15, color: Colors.white),
+                    ),
+                  )),
+            if (widget.showCount != null && widget.showCount == true)
+              widget.media.length == 1
+                  ? const SizedBox.shrink()
+                  : Positioned(
+                      top: 5,
+                      right: 5,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Text("1/${widget.media.length}",
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            offset: const Offset(0, 1),
+                                            blurRadius: 3.0,
+                                            color:
+                                                Colors.black.withOpacity(0.5),
+                                          ),
+                                        ])),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          Text('${widget.authorName ?? ""}',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      offset: const Offset(0, 1),
-                                      blurRadius: 3.0,
-                                      color: Colors.black.withOpacity(0.5),
-                                    ),
-                                  ])),
-                        ],
-                      ),
-                    ),
-                  ),
-                )),
-            Positioned(
-                top: 5,
-                right: 5,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          Text('1/${widget.media.length}',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      offset: const Offset(0, 1),
-                                      blurRadius: 3.0,
-                                      color: Colors.black.withOpacity(0.5),
-                                    ),
-                                  ])),
-                        ],
-                      ),
-                    ),
-                  ),
-                ))
+                        ),
+                      ))
           ],
         ),
       ),

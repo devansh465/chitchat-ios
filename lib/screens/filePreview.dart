@@ -212,7 +212,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
     _files = List.from(widget.files);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (editedFiles.length == 1) {
+      if (editedFiles.length == 1 && !widget.isPost! && !widget.isGroupPost!) {
         _editFile(editedFiles[0], 0);
       }
     });
@@ -299,6 +299,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                       onPressed: () {
                         if (uploadFinished == true) {
                           Navigator.of(context).pop();
+                          Navigator.of(context).pop();
                         } else {
                           setState(() {
                             showErrorText = true;
@@ -382,7 +383,9 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                     //Share.shareUri(Uri.file(uri));
                     //Navigator.pop(context, uri);
                     // Show bottom-right circular selector
-                    if (editedFiles.length > 1) {
+                    if (editedFiles.length > 1 ||
+                        widget.isPost! ||
+                        widget.isGroupPost!) {
                       Navigator.pop(context, uri);
                       return;
                     }

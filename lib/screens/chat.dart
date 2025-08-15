@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
+import 'package:chitchat/screens/search.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
@@ -136,7 +138,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // );
   }
 
-  String typingUserId = '';
+  String _typingUserIdProfilePic = '';
+  ValueNotifier<String> typingUserIdProfilePic = ValueNotifier('');
   void _handleMessage(String message) {
     // Deduplicate and store locally
     //  LocalMessageStore.instance.saveMessageIfUnique(topic, message);
@@ -148,20 +151,28 @@ class _ChatScreenState extends State<ChatScreen> {
       String callerId = joinDetails.sentBy;
       print("Incoming call from $callerId in room $roomId");
       _showIncomingCallDialog(roomId, callerId);
-      return;
+      // return;
     }
     print('Received message: $message');
     if (message.contains('"type":"typing"')) {
       var data = jsonDecode(message);
       if (data['status'] == "TypeWriterStatus.typing") {
-        typingUserId = data['sentBy'];
-
+        String typingUserId = data['sentBy'];
+        typingUserIdProfilePic.value = _chatController.otherUsers
+                .where((user) => user.id == typingUserId)
+                .first
+                .profilePhoto ??
+            '';
         _chatController.setTypingIndicator = true;
+        setState(() {});
       } else {
-        typingUserId = '';
+        typingUserIdProfilePic.value = '';
         _chatController.setTypingIndicator = false;
+        setState(() {});
       }
-      setState(() {});
+
+      print("typing user profile pic $typingUserIdProfilePic");
+
       return;
     }
     if (message.contains('"type":"unsend"')) {
@@ -175,6 +186,31 @@ class _ChatScreenState extends State<ChatScreen> {
       unsendMessage(messageToUnsend, isFromMQTT: true);
       return;
     }
+    if (message.contains('"type":"read"')) {
+      var data = jsonDecode(message);
+      Message seenMessage = Message.fromJson(data['message']);
+      _markAsRead(seenMessage, isFromMQTT: true);
+      return;
+    }
+    if (message.contains('"type":"reaction"')) {
+      var data = jsonDecode(message);
+      Message seenMessage = Message.fromJson(data['message']);
+      _setReaction(seenMessage, true);
+
+      return;
+    }
+    if (message.contains('"type":"edit"')) {
+      var data = jsonDecode(message);
+      Message messageToEdit = Message.fromJson(data['message']);
+      if (messageToEdit.createdAt
+          .isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
+        print("message is older than 1 days so not editing.");
+        return;
+      }
+      _editMessage(messageToEdit, isFromMQTT: true);
+      return;
+    }
+
     // You can also notify listeners or update the UI here
     receiveMessage(mess: message);
   }
@@ -206,6 +242,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     page++;
+
     return _initialMessages.reversed.toList();
   }
 
@@ -255,12 +292,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   late final MQTTService mqtt;
   bool isConnected = false;
+  bool _dialogShown = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_dialogShown) return;
 
     clearMessageNotification();
-    if (profileDetails != null) {
+    if (profileDetails != null && profileDetails!['myGroup'] != null) {
       groupDetails =
           GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
       if (mounted) {
@@ -269,7 +309,39 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
-    if (profileDetails == null) {
+    if (profileDetails!['myGroup'] == null) {
+      _dialogShown = true;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('No group Found'),
+              content: Text('Please create or join one to continue.'),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('ok'),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+
+                    Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => SearchPage(),
+                        ),
+                        (route) => route.isFirst);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      });
+      return;
+    } else if (profileDetails == null) {
+      _dialogShown = true;
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         showDialog(
           context: context,
@@ -299,10 +371,30 @@ class _ChatScreenState extends State<ChatScreen> {
     _getToken(groupDetails?.groupId);
   }
 
+  void _setReaction(Message reactions, bool isFromMQTT) async {
+    try {
+      await chats
+          .updateMany({"id": reactions.id}, {"reaction": reactions.reaction});
+      Message mtu = _findMessage(reactions);
+      mtu = reactions;
+      if (!isFromMQTT) {
+        mqtt.publish(
+          jsonEncode({
+            'type': 'reaction',
+            'message': reactions.toJson(),
+          }),
+        );
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
+    clearMessageNotification();
     print(profileDetails);
     initDB().then((value) {
       print('Database initialized successfully');
@@ -317,10 +409,12 @@ class _ChatScreenState extends State<ChatScreen> {
           onReaction: (reaction) {
             /// Do something when user reacts to message
             debugPrint('Message Reacted${reaction.toString()}');
+            _setReaction(reaction, false);
           },
           onReactionRemoved: (reaction) {
             /// Do something when user removes reaction from message
             debugPrint('Message Reacted Removed ${reaction.toString()}');
+            _setReaction(reaction, false);
           },
           currentUser: ChatUser(
             id: profileDetails?["_id"],
@@ -399,8 +493,13 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     // TODO: implement dispose
     super.dispose();
-    mqtt.disconnect();
+    try {
+      mqtt.disconnect();
+    } catch (e) {
+      print(e);
+    }
     timer?.cancel();
+    clearMessageNotification();
   }
 
   void _showHideTypingIndicator() {
@@ -444,6 +543,117 @@ class _ChatScreenState extends State<ChatScreen> {
     ]);
   }
 
+  void _openMore(Message message, bool isFromCurrentUser) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isFromCurrentUser)
+                  ListTile(
+                    leading: Icon(Icons.edit, color: Colors.blue),
+                    title: Text("Edit"),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showEditMessagePopup(message);
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(Icons.push_pin, color: Colors.orange),
+                  title: Text("Pin"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Handle pin action
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditMessagePopup(Message message) {
+    final TextEditingController controller =
+        TextEditingController(text: message.message);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Message'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final newMessage = message.copyWith(message: controller.text);
+              Navigator.of(context).pop();
+              _editMessage(newMessage);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editMessage(Message message, {bool isFromMQTT = false}) {
+    print('editing message: ${message.message}');
+    if (message.createdAt
+        .isBefore(DateTime.now().subtract(const Duration(days: 2)))) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Editing Not Allowed'),
+          content: const Text(
+              'You can only Edit messages sent within the last 1 days.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Ok'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      //_chatController.initialMessageList.remove(_findMessage(message));
+      _findMessage(message).message = message.message;
+      _chatController.removeReplySuggestions();
+
+      chats.updateMany({
+        'id': message.id,
+      }, {
+        "message": message.message
+      }).then((value) {
+        print('Message edited successfully: $value');
+      }).catchError((error) {
+        print('Error edited message: $error');
+      });
+      if (!isFromMQTT) {
+        mqtt.publish(
+          jsonEncode({
+            'type': 'edit',
+            'message': message.toJson(),
+          }),
+        );
+      }
+    }
+    setState(() {});
+  }
+
   void unsendMessage(Message message, {bool isFromMQTT = false}) {
     print('Unsend message: ${message.message}');
     if (message.createdAt
@@ -461,7 +671,9 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             TextButton(
               onPressed: () {
-                _chatController.initialMessageList.remove(message);
+                _chatController.initialMessageList
+                    .remove(_findMessage(message));
+                _chatController.removeReplySuggestions();
                 chats.deleteMany({
                   'id': message.id,
                 }).then((value) {
@@ -477,7 +689,9 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     } else {
-      _chatController.initialMessageList.remove(message);
+      _chatController.initialMessageList.remove(_findMessage(message));
+      _chatController.removeReplySuggestions();
+
       chats.deleteMany({
         'id': message.id,
       }).then((value) {
@@ -494,6 +708,49 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
+    setState(() {});
+  }
+
+  void _markAsRead(Message message, {bool isFromMQTT = false}) {
+    // if (message.status == MessageStatus.read) {
+    //   return;
+    // }
+    final Message messageToUpdate = _findMessage(message);
+    messageToUpdate.setStatus = MessageStatus.read;
+    chats.updateMany({
+      'id': message.id,
+    }, {
+      'readBy': _chatController.currentUser.id,
+      "status": "read"
+    }).then((value) {
+      print('Message read successfully: $value');
+      if (!isFromMQTT) {
+        mqtt.publish(
+          jsonEncode({
+            'type': 'read',
+            'status': "read",
+            'sentBy': _chatController.currentUser.id,
+            'groupId': groupDetails!.groupId,
+            'message': message.toJson(),
+          }),
+        );
+      }
+    }).catchError((error) {
+      print('Error marking message as read: $error');
+    });
+  }
+
+  /// find the message on the ui so it can be updated on the uis also
+  Message _findMessage(Message message) {
+    // try {
+
+    //locate the message in chatlist
+    final Message messageToupdate = _chatController.initialMessageList
+        .firstWhere((m) => m.id == message.id);
+    return messageToupdate;
+    // } catch (e) {
+
+    // }
   }
 
   bool isLoading = false;
@@ -668,9 +925,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
                 elevation: theme.elevation,
                 backGroundColor: theme.appBarColor,
-                profilePicture: groupDetails!.groupData['GroupProfilePic'],
+                profilePicture:
+                    groupDetails?.groupData['GroupProfilePic'] ?? "",
                 backArrowColor: theme.backArrowColor,
-                chatTitle: groupDetails!.groupData['name'],
+                chatTitle: groupDetails?.groupData['name'] ?? "",
                 chatTitleTextStyle: TextStyle(
                   color: theme.appBarTitleTextStyle,
                   fontWeight: FontWeight.bold,
@@ -754,6 +1012,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 micIconColor: theme.replyMicIconColor,
                 voiceRecordingConfiguration: VoiceRecordingConfiguration(
+                  bitRate: 64000,
                   backgroundColor: theme.waveformBackgroundColor,
                   recorderIconColor: theme.recordIconColor,
                   waveStyle: WaveStyle(
@@ -789,6 +1048,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onMessageRead: (message) {
                     /// send your message reciepts to the other client
                     debugPrint('Message Read');
+                    _markAsRead(message);
                   },
                   senderNameTextStyle:
                       TextStyle(color: theme.inComingChatBubbleTextColor),
@@ -801,7 +1061,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 topBorderColor: theme.replyPopupTopBorderColor,
                 onUnsendTap: unsendMessage,
                 onMoreTap: (message, sentByCurrentUser) {
-                  //show message readby popup
+                  _openMore(message, sentByCurrentUser);
+                  //show popover menu with a option edit
                 },
               ),
               reactionPopupConfig: ReactionPopupConfiguration(
@@ -984,12 +1245,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               profileCircleConfig: ProfileCircleConfiguration(
-                profileImageUrl: _chatController.otherUsers
-                    .firstWhere(
-                      (user) => user.id == typingUserId,
-                      orElse: () => _chatController.currentUser,
-                    )
-                    .profilePhoto,
+                profileImageUrl: typingUserIdProfilePic,
               ),
               repliedMessageConfig: RepliedMessageConfiguration(
                 backgroundColor: theme.repliedMessageColor,
@@ -1140,8 +1396,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     mqtt.publish(jsonEncode(callMessage.toJson()));
-    _chatController.addMessage(callMessage);
-    callMessage.setStatus = MessageStatus.delivered;
+    // _chatController.addMessage(callMessage);
+    // callMessage.setStatus = MessageStatus.delivered;
 
     // Step 2: Join call
     final options = JitsiMeetConferenceOptions(

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:event_handeler/event_handeler.dart';
 import 'package:http/http.dart' as http;
@@ -54,6 +55,8 @@ class ChatServices {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     int currentCount = prefs.getInt("messageNotificationCount") ?? 0;
     prefs.setInt("messageNotificationCount", currentCount + 1);
+    NotificationIcon.updateCount(
+        currentCount + 1, NotificationIconType.Message);
   }
 
   static Future<void> setMessageNotificationCount(int count) async {

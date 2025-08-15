@@ -13,6 +13,7 @@ import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/chat.dart';
+import 'package:chitchat/screens/profilePrivet.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
@@ -521,9 +522,10 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                           ),
                           TextButton(
                             child: const Text('Leave'),
-                            onPressed: () {
+                            onPressed: () async {
                               // Add leave group functionality
-                              // GroupsService.leaveGroup(groupId);
+                              await GroupsService.leaveGroup(
+                                  groupDetails!.groupId);
                               Navigator.pop(context); // Close dialog
                               Navigator.pop(
                                   context); // Return to previous screen
@@ -569,6 +571,16 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                     'Member ${member.id}: ${member.avatarUrl} ${member.additionalData['memberName']}');
                 return ListTile(
                   onTap: () {
+                    if (member.id == profileDetails!['uid']) {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: PrivetProfilePage(),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
                       PageTransition(

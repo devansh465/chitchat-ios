@@ -11,12 +11,13 @@ class VideoMessageView extends StatefulWidget {
   const VideoMessageView({
     super.key,
     required this.url,
+    this.onTap,
     this.highlightVideo = false,
     this.highlightScale = 1.2,
   });
 
   final String url;
-
+  final VoidCallback? onTap;
   final bool highlightVideo;
   final double highlightScale;
 
@@ -60,16 +61,17 @@ class _VideoMessageViewState extends State<VideoMessageView> {
       child: Stack(
         children: [
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FullScreenVideoPlayer(
-                  videoUrl: videoUrl,
-                  heroTag: widget.url,
-                  fromMemory: false,
-                ),
-              ),
-            ),
+            onTap: widget.onTap ??
+                () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FullScreenVideoPlayer(
+                          videoUrl: videoUrl,
+                          heroTag: widget.url,
+                          fromMemory: false,
+                        ),
+                      ),
+                    ),
             child: SizedBox(
               child: _thumbnailBytes != null
                   ? Stack(

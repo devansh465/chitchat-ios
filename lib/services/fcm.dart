@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/components/friendcircle.dart';
+import 'package:chitchat/main.dart';
+import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/services/chats.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/notification.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/entities/call_kit_params.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
@@ -85,6 +88,10 @@ class FCMHandler {
     await _processMessage(message, showNotification: false);
   }
 
+  static Future<void> handleNotificationTap(RemoteMessage message) async {
+    await _onTap(message);
+  }
+
   static Future<void> _onBackground(RemoteMessage message) async {
     await _processMessage(message, showNotification: false, isBackGround: true);
   }
@@ -99,6 +106,12 @@ class FCMHandler {
     if (id != null) {
       await NotificationService.storeUnreadIds([id]);
     }
+    if (type == "text" && isBackGround) {
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => ChatScreen()),
+        (route) => route.isFirst,
+      );
+    }
 
     if (showNotification) {
       _localNotifications.show(
@@ -110,7 +123,7 @@ class FCMHandler {
         ),
       );
     }
-    if (type == "message" && isBackGround) {
+    if (type == "text") {
       await ChatServices.incrementMessageNotificationCount();
     }
 
@@ -123,7 +136,10 @@ class FCMHandler {
       if (calls.isNotEmpty) {
         // Don't show another incoming call
         print("⚠️ Call already active. Skipping duplicate CallKit.");
-        return;
+        final calls = await FlutterCallkitIncoming.activeCalls();
+        for (final call in calls) {
+          await FlutterCallkitIncoming.endCall(call['id']);
+        }
       }
       await _showCallKit(data, isBackground: isBackGround);
     }
@@ -153,7 +169,7 @@ class FCMHandler {
       final groupDetails =
           GroupsService.buildFriendCircleGroup(profileDetails?['myGroup']);
 
-      final caller = groupDetails?.members.firstWhere(
+      caller = groupDetails?.members.firstWhere(
           (e) => e.id == joinDetails.sentBy,
           orElse: () => FriendCircleMember(
               id: joinDetails.sentBy, avatarUrl: '', additionalData: {}));

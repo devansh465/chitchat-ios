@@ -118,18 +118,33 @@ class _NotificationIconState extends State<NotificationIcon> {
               Positioned(
                 right: widget.rightPadding - 5,
                 top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: widget.badgeColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: widget.badgeSize,
-                      fontWeight: FontWeight.bold,
+                child: GestureDetector(
+                  onTap: widget.onPressed ??
+                      () {
+                        Navigator.push(
+                          context,
+                          PageTransition(
+                            type: PageTransitionType.rightToLeft,
+                            child:
+                                widget.type == NotificationIconType.Notification
+                                    ? const NotificationsScreen()
+                                    : const ChatScreen(),
+                          ),
+                        );
+                      },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: widget.badgeColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: widget.badgeSize,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
