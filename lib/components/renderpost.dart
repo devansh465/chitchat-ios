@@ -403,8 +403,15 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                 ),
                               ),
                             ),
-                            SliverToBoxAdapter(
-                              child: Row(
+                            //likes comments
+
+                            RelatedPostsWidget(
+                              postId: widget.postId,
+                              authorId: widget.author,
+                              profilePic: widget.profilePic ?? "",
+                              authorName: widget.authorName ?? "",
+                              scrollController: scrollController,
+                              middleItem: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
@@ -471,34 +478,6 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                 ],
                               ),
                             ),
-                            SliverToBoxAdapter(
-                              child: Container(
-                                height: 60,
-                                child: const Center(
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.explore),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            "Explore",
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14),
-                                          ),
-                                        ],
-                                      )
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            RelatedPostsWidget(
-                                postId: widget.postId,
-                                scrollController: scrollController),
                           ],
                         ),
                       ),
@@ -963,7 +942,8 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                       Shadow(
                                         offset: const Offset(0, 1),
                                         blurRadius: 3.0,
-                                        color: Colors.black.withOpacity(0.5),
+                                        color:
+                                            Colors.black.withValues(alpha: 0.5),
                                       ),
                                     ])),
                           ],
