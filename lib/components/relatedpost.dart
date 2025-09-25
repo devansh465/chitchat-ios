@@ -601,98 +601,21 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
       return SliverToBoxAdapter(child: _buildEmptyState());
     }
 
-    // Create a column that contains the header and masonry grid
-    return SliverToBoxAdapter(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 10, right: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [_buildUserInfo()],
-                ),
-              ),
-              widget.middleItem,
-              if (group != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 10, right: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [Text("<-- explore my group -->")],
-                            ),
-                            SizedBox(
-                              height: 15,
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  group!.groupData["name"],
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage: group!
-                                .groupData["GroupProfilePic"].isNotEmpty
-                            ? NetworkImage(group!.groupData['GroupProfilePic'])
-                            : null,
-                        child: group!.groupData["GroupProfilePic"].isEmpty
-                            ? Text(
-                                group!.groupData["name"].isNotEmpty
-                                    ? group!.groupData["name"][0].toUpperCase()
-                                    : 'G',
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              )
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-
-          // Masonry grid of posts
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: MasonryGridView.count(
-              shrinkWrap: true, // Important: let it size itself
-              physics:
-                  const NeverScrollableScrollPhysics(), // Disable internal scrolling
-              crossAxisCount: 2,
-              mainAxisSpacing: 0,
-              crossAxisSpacing: 0,
-              itemCount: allPosts.length + (hasMoreData ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == allPosts.length) {
-                  return _buildLoadingIndicator();
-                }
-                return _buildPostItem(allPosts[index], index);
-              },
-            ),
-          ),
-        ],
+    // Build the actual list of posts + optional loading indicator at the end
+    return SliverPadding(
+      padding: const EdgeInsets.all(8),
+      sliver: SliverMasonryGrid.count(
+        crossAxisCount: 2,
+        mainAxisSpacing: 0,
+        crossAxisSpacing: 0,
+        itemBuilder: (context, index) {
+          if (index == allPosts.length) {
+            // Loading indicator at the bottom
+            return _buildLoadingIndicator();
+          }
+          return _buildPostItem(allPosts[index], index);
+        },
+        childCount: allPosts.length + (hasMoreData ? 1 : 0),
       ),
     );
   }
