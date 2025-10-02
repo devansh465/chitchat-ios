@@ -12,8 +12,8 @@ class ImprovedSearchBar extends StatefulWidget {
 
   final Function(List<FriendCircleGroup>) onGroupSearchResult;
   final Function(List<Map<String, dynamic>>) onUserSearchResult;
-  final Function(List<FriendCircleGroup>) onCollegeSearchResult;
-  final Function(List<FriendCircleGroup>) onUniversitySearchResult;
+  final Function(List<Map<String, dynamic>>) onCollegeSearchResult;
+  final Function(List<Map<String, dynamic>>) onUniversitySearchResult;
 
   const ImprovedSearchBar({
     super.key,
@@ -75,30 +75,29 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
 
         // Call the callback function with the search results
         widget.onUserSearchResult(searchResultGroups);
+      } else if (selectedType == "College") {
+        print('Searching for: $query');
+        widget.onLoading(true);
+        var searchResultGroups = await SearchService.searchByCollege(query);
+        // Update the UI with the search results
+        setState(() {});
+        print(searchResultGroups);
+        widget.onLoading(false);
+
+        // Call the callback function with the search results
+        widget.onCollegeSearchResult(searchResultGroups);
+      } else if (selectedType == "University") {
+        print('Searching for: $query');
+        widget.onLoading(true);
+        var searchResultGroups = await SearchService.searchByUniversity(query);
+        // Update the UI with the search results
+        setState(() {});
+        print(searchResultGroups);
+        widget.onLoading(false);
+
+        // Call the callback function with the search results
+        widget.onUniversitySearchResult(searchResultGroups);
       }
-      // else if (selectedType == "College") {
-      //   print('Searching for: $query');
-      //   widget.onLoading(true);
-      //   searchResultGroups = await SearchService.searchByCollege(query);
-      //   // Update the UI with the search results
-      //   setState(() {});
-      //   print(searchResultGroups);
-      //   widget.onLoading(false);
-
-      //   // Call the callback function with the search results
-      //   widget.onCollegeSearchResult(searchResultGroups);
-      // } else if (selectedType == "University") {
-      //   print('Searching for: $query');
-      //   widget.onLoading(true);
-      //   searchResultGroups = await SearchService.searchByUniversity(query);
-      //   // Update the UI with the search results
-      //   setState(() {});
-      //   print(searchResultGroups);
-      //   widget.onLoading(false);
-
-      //   // Call the callback function with the search results
-      //   widget.onUniversitySearchResult(searchResultGroups);
-      // }
     });
   }
 

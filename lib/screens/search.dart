@@ -128,8 +128,16 @@ class _SearchPageState extends State<SearchPage> {
                   groups = ResultGroups;
                 });
               },
-              onCollegeSearchResult: (p0) {},
-              onUniversitySearchResult: (p0) {},
+              onCollegeSearchResult: (p0) {
+                setState(() {
+                  searchResultColleges = p0;
+                });
+              },
+              onUniversitySearchResult: (p0) {
+                setState(() {
+                  searchResultUniversities = p0;
+                });
+              },
               onUserSearchResult: (p0) {
                 if (mounted) {
                   setState(() {
@@ -164,7 +172,11 @@ class _SearchPageState extends State<SearchPage> {
                         : Column(
                             children: selectedType == "Name"
                                 ? _searchUsers()
-                                : _recomandedFC(),
+                                : selectedType == "University"
+                                    ? _searchUniversities()
+                                    : selectedType == "College"
+                                        ? _searchColleges()
+                                        : _recomandedFC(),
                           ),
               ),
             ),
@@ -720,6 +732,158 @@ class _SearchPageState extends State<SearchPage> {
                   if (user['school'] != null)
                     Text(
                       'School: ${user['school']}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'Poppins',
+                          color: Colors.white70),
+                    ),
+                ],
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageTransition(
+                    type: PageTransitionType.rightToLeft,
+                    child: PublicProfilePage(
+                        dbIndex: user['dbIndex'], uid: user['id']),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      )),
+    ];
+  }
+
+  List<Widget> _searchUniversities() {
+    return [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 10,
+          ),
+          Text(
+            "${searchResultUniversities.length} Universities Found",
+            textAlign: TextAlign.left,
+            style: TextStyle(
+                fontSize: 15,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.bold,
+                color: Colors.white),
+          ),
+          SizedBox(
+            height: 10,
+            child: Divider(),
+          ),
+        ],
+      ),
+      Expanded(
+          child: ListView.builder(
+        itemCount: searchResultUniversities.length,
+        itemBuilder: (context, index) {
+          final user = searchResultUniversities[index];
+          return Card(
+            color: Colors.transparent,
+            margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              title: Text(
+                user['Name of the University'] ?? 'Unknown',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: Colors.white),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (user['Address'] != null)
+                    Text(
+                      'Address: ${user['Address']}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'Poppins',
+                          color: Colors.white70),
+                    ),
+                ],
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageTransition(
+                    type: PageTransitionType.rightToLeft,
+                    child: PublicProfilePage(
+                        dbIndex: user['dbIndex'], uid: user['id']),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      )),
+    ];
+  }
+
+  List<Widget> _searchColleges() {
+    return [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 10,
+          ),
+          Text(
+            "${searchResultColleges.length} Colleges Found",
+            textAlign: TextAlign.left,
+            style: TextStyle(
+                fontSize: 15,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.bold,
+                color: Colors.white),
+          ),
+          SizedBox(
+            height: 10,
+            child: Divider(),
+          ),
+        ],
+      ),
+      Expanded(
+          child: ListView.builder(
+        itemCount: searchResultColleges.length,
+        itemBuilder: (context, index) {
+          final user = searchResultColleges[index];
+          return Card(
+            color: Colors.transparent,
+            margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              title: Text(
+                user['Name of the college'] ?? 'Unknown',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: Colors.white),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (user['Affiliated To University'] != null)
+                    Text(
+                      'Affiliated To University: ${user['Affiliated To University']}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'Poppins',
+                          color: Colors.white70),
+                    ),
+                  if (user['College address'] != null)
+                    Text(
+                      'College address: ${user['College address']}',
                       style: TextStyle(
                           fontSize: 12,
                           fontFamily: 'Poppins',
