@@ -108,7 +108,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       child: Text(
-                        '${friendGroups.isNotEmpty ? "Showing Top ${friendGroups.length} Groups" : 'Searching for groups...'} ',
+                        '${friendGroups.isNotEmpty ? "Showing Top ${friendGroups.length} Groups" : isLoading ? 'Searching for groups...' : 'No groups found'} ',
                         style: TextStyle(
                           color: selectedTab == 0 ? Colors.white : Colors.grey,
                           fontSize: 16,

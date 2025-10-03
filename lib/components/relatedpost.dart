@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
+import 'package:crypto/crypto.dart';
 import 'package:page_transition/page_transition.dart';
 
 class RelatedPostsWidget extends StatefulWidget {
@@ -384,6 +384,12 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
   Widget _buildUserInfo() {
     FriendCircleMember authorMember = group!.members.firstWhere(
       (element) => element.id == widget.authorId,
+      orElse: () => FriendCircleMember(
+        avatarUrl:
+            "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
+        id: "",
+        additionalData: {},
+      ),
     );
 
     String? educationField = _getEducationField(authorMember.additionalData);
@@ -657,7 +663,9 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    group!.groupData["name"],
+                                    group!.groupData["name"].length > 25
+                                        ? '${group!.groupData["name"].substring(0, 22)}...'
+                                        : group!.groupData["name"],
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
