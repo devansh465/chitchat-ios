@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chitchat/appstate/storyPrefs.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/friendcircle.dart';
@@ -28,6 +29,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await FCMHandler.initialize();
+  await StoryPrefs.init();
   runApp(OKToast(
       child: MaterialApp(navigatorKey: navigatorKey, home: LoginScreen())));
 }

@@ -352,6 +352,9 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
         );
         setState(() {
           AppVariables.update("posts", result['data']);
+          if (widget.isGroupPost == true) {
+            AppVariables.update("group_posts", result['data']);
+          }
           uploadFinished = true;
         });
       } else {
@@ -495,6 +498,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
         );
         setState(() {
           // posts.add(result['data']);
+          AppVariables.update("memories", result['data']);
           uploadFinished = true;
         });
       } else {

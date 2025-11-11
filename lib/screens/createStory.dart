@@ -191,6 +191,11 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
           // posts.add(result['data']);
           uploadFinished = true;
         });
+        Navigator.of(context).pop();
+        Navigator.pushReplacement(
+            context,
+            PageTransition(
+                type: PageTransitionType.leftToRight, child: const HomePage()));
       } else {
         print(result);
         _progressNotifier.value = _progressNotifier.value.copyWith(
@@ -400,22 +405,22 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
               );
             },
             child: const Card(
-              margin: const EdgeInsets.all(16.0),
+              margin: EdgeInsets.all(16.0),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.group, size: 24),
-                    const SizedBox(width: 16),
-                    const Text(
+                    Icon(Icons.group, size: 24),
+                    SizedBox(width: 16),
+                    Text(
                       'Send to Group',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Spacer(),
-                    const Icon(Icons.arrow_forward_ios, size: 16),
+                    Spacer(),
+                    Icon(Icons.arrow_forward_ios, size: 16),
                   ],
                 ),
               ),

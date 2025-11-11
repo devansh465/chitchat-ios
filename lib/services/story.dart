@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:chitchat/appstate/storyPrefs.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class UserStory {
-  final String id; // Unique identifier for each story
+  final String id;
   final String user;
   final String name;
   final String username;
@@ -13,10 +14,10 @@ class UserStory {
   final List<MediaItem> media;
   final String visibleTo;
   final DateTime date;
-  bool isViewed;
-  bool myStory = false; // Default to false
+  bool _isViewed = false;
+  bool myStory = false;
   final List views;
-  final int dbIndex; // Default to 0, can be used for database indexing
+  final int dbIndex;
 
   UserStory({
     required this.id,
@@ -27,11 +28,21 @@ class UserStory {
     required this.media,
     required this.visibleTo,
     required this.views,
-    this.isViewed = false, // Default to false
+    bool isViewed = false,
     required this.date,
     this.myStory = false,
     required this.dbIndex,
-  });
+  }) {
+    // Initialize from cache instantly
+    _isViewed = isViewed || StoryPrefs.hasViewedSync(id);
+  }
+
+  bool get isViewed => _isViewed;
+
+  set isViewed(bool value) {
+    _isViewed = value;
+    if (value) StoryPrefs.markAsViewed(id);
+  }
 
   factory UserStory.fromJson(Map<String, dynamic> json) {
     return UserStory(

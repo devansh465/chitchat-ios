@@ -46,6 +46,7 @@ class _CameraPageState extends State<CameraPage> {
   void dispose() {
     // Cancel the subscription to prevent memory leaks
     // _captureStateSubscription.cancel();
+
     super.dispose();
   }
 

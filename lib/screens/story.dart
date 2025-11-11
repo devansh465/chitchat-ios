@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/story.dart';
 import 'package:flutter/material.dart';
 import 'package:story_view/story_view.dart';
 
 class StoryViewScreen extends StatefulWidget {
   final List<UserStory> storyItems;
-  final int initialIndex;
+  final String initialIndex;
 
   const StoryViewScreen({
     Key? key,
@@ -38,6 +40,7 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
         );
       }
       widget.storyItems[currentUserIndex].isViewed = true;
+      AppVariables.update("story_viewed_index", widget.initialIndex);
     } else {
       if (widget.storyItems[currentUserIndex].myStory) {
         return;
@@ -49,6 +52,7 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
         );
       }
       widget.storyItems[currentUserIndex].isViewed = true;
+      AppVariables.update("story_viewed_index", widget.initialIndex);
 
       Navigator.pop(context); // Close when all stories are done
     }
@@ -152,60 +156,74 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
             left: 10,
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      // gradient: LinearGradient(
-                      //   colors: [
-                      //     Color.fromARGB(255, 198, 101, 10),
-                      //     Color.fromARGB(255, 255, 179, 0),
-                      //     Color.fromARGB(255, 96, 4, 194)
-                      //   ],
-                      // ),
-                      color: widget.storyItems[currentUserIndex].getColor(),
-                      shape: BoxShape.circle,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PublicProfilePage(
+                        uid: widget.storyItems[currentUserIndex].user,
+                        dbIndex: 'x',
+                      ),
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF121212),
+                  );
+                },
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        // gradient: LinearGradient(
+                        //   colors: [
+                        //     Color.fromARGB(255, 198, 101, 10),
+                        //     Color.fromARGB(255, 255, 179, 0),
+                        //     Color.fromARGB(255, 96, 4, 194)
+                        //   ],
+                        // ),
+                        color: widget.storyItems[currentUserIndex].getColor(),
                         shape: BoxShape.circle,
                       ),
-                      child: CachedNetworkImage(
-                        imageUrl:
-                            widget.storyItems[currentUserIndex].profilePic,
-                        imageBuilder: (context, imageProvider) => CircleAvatar(
-                          radius: 20,
-                          backgroundImage: imageProvider,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF121212),
+                          shape: BoxShape.circle,
                         ),
-                        placeholder: (context, url) => const CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Color(0xFF2A2A2A),
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              widget.storyItems[currentUserIndex].profilePic,
+                          imageBuilder: (context, imageProvider) =>
+                              CircleAvatar(
+                            radius: 20,
+                            backgroundImage: imageProvider,
+                          ),
+                          placeholder: (context, url) => const CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Color(0xFF2A2A2A),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "${widget.storyItems[currentUserIndex].username}",
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.white),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "${_timeAgo(widget.storyItems[currentUserIndex].date)}",
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "${widget.storyItems[currentUserIndex].username}",
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.white),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          "${_timeAgo(widget.storyItems[currentUserIndex].date)}",
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

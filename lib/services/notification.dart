@@ -1,4 +1,5 @@
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -14,6 +15,7 @@ class AppNotification {
   final Map<String, dynamic>? data;
   final String? clickAction;
   final String? link;
+  final String? id;
 
   const AppNotification({
     this.title,
@@ -24,6 +26,7 @@ class AppNotification {
     this.data,
     this.clickAction,
     this.link,
+    this.id,
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
@@ -50,6 +53,8 @@ class AppNotification {
       // support both snake_case and camelCase keys
       clickAction: (json['click_action'] ?? json['clickAction']) as String?,
       link: json['link'] as String?,
+      id: json['_id'] as String? ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
     );
   }
 
@@ -63,6 +68,7 @@ class AppNotification {
       'data': data,
       'click_action': clickAction,
       'link': link,
+      'id': id,
     }..removeWhere((_, v) => v == null);
   }
 
@@ -75,6 +81,7 @@ class AppNotification {
     Map<String, dynamic>? data,
     String? clickAction,
     String? link,
+    String? id,
   }) {
     return AppNotification(
       title: title ?? this.title,
@@ -85,12 +92,13 @@ class AppNotification {
       data: data ?? this.data,
       clickAction: clickAction ?? this.clickAction,
       link: link ?? this.link,
+      id: id ?? this.id,
     );
   }
 
   @override
   String toString() {
-    return 'AppNotification(title: $title, body: $body, type: $type, icon: $icon, image: $image, data: $data, clickAction: $clickAction, link: $link)';
+    return 'AppNotification(id: $id, title: $title, body: $body, type: $type, icon: $icon, image: $image, data: $data, clickAction: $clickAction, link: $link)';
   }
 
   @override
@@ -104,7 +112,8 @@ class AppNotification {
         other.image == image &&
         _mapEquals(other.data, data) &&
         other.clickAction == clickAction &&
-        other.link == link;
+        other.link == link &&
+        other.id == id;
   }
 
   @override
@@ -118,6 +127,7 @@ class AppNotification {
       data == null ? null : _deepMapHash(data!),
       clickAction,
       link,
+      id,
     );
   }
 
@@ -210,6 +220,7 @@ class NotificationService {
 // Get unread count
   static Future<int> getNotificationCount() async {
     final prefs = await SharedPreferences.getInstance();
+    getNotifications(null, showLoaders: false);
     return prefs.getInt("unreadcount") ?? 0;
   }
 
@@ -244,15 +255,16 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove("unreadIds");
     await prefs.remove("unreadcount");
+    NotificationIcon.updateCount(0, NotificationIconType.Notification);
   }
 
 // fetch notifications
-  static Future<List<AppNotification>?> getNotifications(BuildContext context,
+  static Future<List<AppNotification>?> getNotifications(BuildContext? context,
       {bool showMessage = true, bool showLoaders = true}) async {
     try {
       String? accessToken = await UserService.getAccessToken();
-
-      if (showLoaders) {
+      print("Fetching notifications");
+      if (showLoaders && context != null) {
         showLoader(context);
       }
       final response = await http.get(
@@ -265,7 +277,7 @@ class NotificationService {
       );
 
       final data = jsonDecode(response.body);
-      if (showLoaders) {
+      if (showLoaders && context != null) {
         hideLoader(context);
       }
 
@@ -276,7 +288,8 @@ class NotificationService {
       // Parse and return the notifications
       List<AppNotification> notifications = List<AppNotification>.from(
           data.map((notif) => AppNotification.fromJson(notif)));
-
+      await storeUnreadIds(
+          notifications.where((n) => n.id != null).map((n) => n.id!).toList());
       return notifications;
 
       // Extract unique notification IDs
@@ -290,7 +303,7 @@ class NotificationService {
 
       // return List<Map<String, dynamic>>.from(data["notifications"]);
     } catch (error) {
-      if (showMessage) {
+      if (showMessage && context != null) {
         hideLoader(context);
         showPopup(context, error.toString());
       }

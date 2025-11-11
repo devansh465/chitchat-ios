@@ -3,10 +3,15 @@ import 'dart:ui';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/components/recomandedgroups.dart';
+import 'package:chitchat/screens/groupPublic.dart';
+import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/watchlist.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
+
+import 'package:page_transition/page_transition.dart';
 
 class WatchlistPage extends StatefulWidget {
   @override
@@ -43,7 +48,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
       }
       if (friendGroups.isNotEmpty) {
         FriendCircleGroup groupCopy = friendGroups[0];
-        friendGroups = List.generate(4, (_) => groupCopy.copy());
+        friendGroups = List.generate(40, (_) => groupCopy.copy());
       }
 
       // Generate connections between circles (like a network map)
@@ -148,6 +153,16 @@ class _WatchlistPageState extends State<WatchlistPage> {
     );
   }
 
+  double get scaleFactor {
+    if (friendGroups.length > 12) {
+      return 0.3;
+    } else if (friendGroups.length > 6) {
+      return 0.5;
+    } else {
+      return 1.0;
+    }
+  }
+
   Widget _buildWatchlistTab() {
     if (isLoading) {
       return const Center(
@@ -166,14 +181,30 @@ class _WatchlistPageState extends State<WatchlistPage> {
         ),
       );
     }
+    if (friendGroups.isEmpty) {
+      return const Center(
+        child: Text(
+          'No groups in watchlist',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
+    }
 
     // Calculate all positions with collision detection
     List<Offset> positions = _calculateAllCirclePositions();
     print("===================???${(friendGroups.length ~/ 3)}");
+    TransformationController _transformationController =
+        TransformationController();
+
+    final double initialScale = scaleFactor; // same as your minScale
+    _transformationController.value = Matrix4.identity()
+      ..scaleByVector3(Vector3.all(initialScale));
+
     return InteractiveViewer(
+      transformationController: _transformationController,
       boundaryMargin: const EdgeInsets.all(80),
       minScale: 0.3,
-      maxScale: 1,
+      maxScale: 2,
       constrained: false,
       child: Container(
         width: MediaQuery.of(context).size.width * 3,
@@ -198,6 +229,31 @@ class _WatchlistPageState extends State<WatchlistPage> {
                   group: group,
                   size: 250,
                   nodeSize: 70,
+                  onGroupTap: () {
+                    Navigator.push(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.rightToLeft,
+                        child: GroupPublicViewScreen(
+                          groupId: group.groupId,
+                        ),
+                      ),
+                    );
+                  },
+                  onMemberTap: (index) {
+                    print(
+                        'Member ${group.members[index].id} in group ${group.groupId} tapped with data: ${group.members[index]}');
+                    Navigator.push(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.rightToLeft,
+                        child: PublicProfilePage(
+                            dbIndex:
+                                group.members[index].additionalData['dbIndex'],
+                            uid: group.members[index].id),
+                      ),
+                    );
+                  },
                   edgeStyle: EdgeStyle(
                     width: 6,
                     outerGlow: 5,
@@ -434,3 +490,321 @@ class ConnectionsPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
+
+// import 'dart:ui';
+
+// import 'package:chitchat/components/friendcircle.dart';
+// import 'package:chitchat/constants/colors.dart';
+// import 'package:chitchat/components/recomandedgroups.dart';
+// import 'package:chitchat/screens/groupPublic.dart';
+// import 'package:chitchat/screens/profilePublic.dart';
+// import 'package:chitchat/services/user.dart';
+// import 'package:chitchat/services/watchlist.dart';
+// import 'package:flutter/material.dart';
+// import 'dart:math';
+
+// import 'package:page_transition/page_transition.dart';
+
+// class WatchlistPage extends StatefulWidget {
+//   @override
+//   _WatchlistPageState createState() => _WatchlistPageState();
+// }
+
+// class _WatchlistPageState extends State<WatchlistPage> {
+//   int selectedTab = 0;
+//   bool isLoading = false;
+//   List<dynamic> friendGroups = [];
+//   final TransformationController _transformationController =
+//       TransformationController();
+
+//   Future<void> _loadWatchlistData() async {
+//     setState(() {
+//       isLoading = true;
+//     });
+
+//     try {
+//       await Future.delayed(const Duration(milliseconds: 500));
+
+//       Map<String, dynamic> data =
+//           await WatchlistServices.getWatchList(await UserService.getUserId());
+//       if (data['success'] == true) {
+//         print(data);
+//         friendGroups = data['data'];
+//       } else {
+//         print(data);
+//         friendGroups = [];
+//       }
+//       if (friendGroups.isNotEmpty) {
+//         FriendCircleGroup groupCopy = friendGroups[0];
+//         friendGroups = List.generate(4, (_) => groupCopy.copy());
+//       }
+//     } catch (e) {
+//       print('Error loading watchlist: $e');
+//     } finally {
+//       setState(() {
+//         isLoading = false;
+//       });
+//     }
+//   }
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadWatchlistData();
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//       final matrix = Matrix4.identity()..scaleByDouble(0.3, 0.3, 0.3, 0.3);
+//       _transformationController.value = matrix;
+//     });
+//   }
+
+//   @override
+//   void dispose() {
+//     _transformationController.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor: AppColors.background,
+//       body: SafeArea(
+//         child: Column(
+//           children: [
+//             // Custom Tab Header
+//             Container(
+//               alignment: Alignment.center,
+//               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+//               child: Row(
+//                 mainAxisAlignment: MainAxisAlignment.center,
+//                 crossAxisAlignment: CrossAxisAlignment.center,
+//                 children: [
+//                   GestureDetector(
+//                     onTap: () => setState(() => selectedTab = 0),
+//                     child: Container(
+//                       padding: const EdgeInsets.symmetric(
+//                           horizontal: 16, vertical: 8),
+//                       child: Text(
+//                         'my watchlist',
+//                         style: TextStyle(
+//                           color: selectedTab == 0 ? Colors.white : Colors.grey,
+//                           fontSize: 16,
+//                           fontWeight: selectedTab == 0
+//                               ? FontWeight.w600
+//                               : FontWeight.w400,
+//                         ),
+//                       ),
+//                     ),
+//                   ),
+//                   const SizedBox(width: 40),
+//                   GestureDetector(
+//                     onTap: () => setState(() => selectedTab = 1),
+//                     child: Container(
+//                       padding: const EdgeInsets.symmetric(
+//                           horizontal: 16, vertical: 8),
+//                       child: Text(
+//                         'for you',
+//                         style: TextStyle(
+//                           color: selectedTab == 1 ? Colors.white : Colors.grey,
+//                           fontSize: 16,
+//                           fontWeight: selectedTab == 1
+//                               ? FontWeight.w600
+//                               : FontWeight.w400,
+//                         ),
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+
+//             // Tab Content
+//             Expanded(
+//               child:
+//                   selectedTab == 0 ? _buildWatchlistTab() : _buildForYouTab(),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildWatchlistTab() {
+//     if (isLoading) {
+//       return const Center(
+//         child: Column(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             CircularProgressIndicator(
+//               valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+//             ),
+//             SizedBox(height: 16),
+//             Text(
+//               'Loading your watchlist...',
+//               style: TextStyle(color: Colors.white54),
+//             ),
+//           ],
+//         ),
+//       );
+//     }
+
+//     if (friendGroups.isEmpty) {
+//       return const Center(
+//         child: Text(
+//           'No groups in watchlist',
+//           style: TextStyle(color: Colors.white54),
+//         ),
+//       );
+//     }
+
+//     // Calculate positions
+//     List<Offset> positions = _calculateTightPackedPositions();
+
+//     // Calculate bounds for the content
+//     double minX = positions.map((p) => p.dx).reduce(min) - 150;
+//     double maxX = positions.map((p) => p.dx).reduce(max) + 150;
+//     double minY = positions.map((p) => p.dy).reduce(min) - 150;
+//     double maxY = positions.map((p) => p.dy).reduce(max) + 150;
+
+//     double contentWidth = maxX - minX;
+//     double contentHeight = maxY - minY;
+
+//     return InteractiveViewer(
+//       transformationController: _transformationController,
+//       boundaryMargin: const EdgeInsets.all(100),
+//       minScale: 0.3,
+//       maxScale: 2.0,
+//       constrained: false,
+//       child: Container(
+//         width: contentWidth,
+//         height: contentHeight,
+//         child: Stack(
+//           children: friendGroups.asMap().entries.map((entry) {
+//             int index = entry.key;
+//             FriendCircleGroup group = entry.value;
+//             Offset position = positions[index];
+
+//             return Positioned(
+//               left: position.dx - minX - 125,
+//               top: position.dy - minY - 125,
+//               child: FriendCircle(
+//                 group: group,
+//                 size: 250,
+//                 nodeSize: 70,
+//                 onGroupTap: () {
+//                   Navigator.push(
+//                     context,
+//                     PageTransition(
+//                       type: PageTransitionType.rightToLeft,
+//                       child: GroupPublicViewScreen(
+//                         groupId: group.groupId,
+//                       ),
+//                     ),
+//                   );
+//                 },
+//                 onMemberTap: (index) {
+//                   print(
+//                       'Member ${group.members[index].id} in group ${group.groupId} tapped');
+//                   Navigator.push(
+//                     context,
+//                     PageTransition(
+//                       type: PageTransitionType.rightToLeft,
+//                       child: PublicProfilePage(
+//                           dbIndex:
+//                               group.members[index].additionalData['dbIndex'],
+//                           uid: group.members[index].id),
+//                     ),
+//                   );
+//                 },
+//                 edgeStyle: EdgeStyle(
+//                   width: 6,
+//                   outerGlow: 5,
+//                   gradientColors: [Colors.blue, Colors.pink, Colors.orange],
+//                 ),
+//               ),
+//             );
+//           }).toList(),
+//         ),
+//       ),
+//     );
+//   }
+
+//   List<Offset> _calculateTightPackedPositions() {
+//     const double circleRadius = 125.0; // Half of circle size
+//     const double minDistance =
+//         280.0; // Slightly more than diameter for tight packing
+//     const double clusterTightness = 0.6; // Lower = tighter clusters
+//     const int maxAttempts = 50;
+
+//     List<Offset> positions = [];
+//     Random random = Random(42); // Fixed seed for consistency
+
+//     // Calculate items per row for base grid
+//     int itemsPerRow = sqrt(friendGroups.length).ceil() + 1;
+
+//     for (int i = 0; i < friendGroups.length; i++) {
+//       Offset? newPosition;
+//       int attempts = 0;
+
+//       while (newPosition == null && attempts < maxAttempts) {
+//         Offset candidate;
+
+//         if (positions.isEmpty) {
+//           // First circle at origin
+//           candidate = const Offset(500, 500);
+//         } else if (i < itemsPerRow) {
+//           // First row - spread horizontally with randomness
+//           double baseX = 500 + (i * minDistance * 1.2);
+//           double offsetY = (random.nextDouble() - 0.5) * 80;
+//           candidate = Offset(baseX, 500 + offsetY);
+//         } else {
+//           // Subsequent circles - place near existing ones with randomness
+//           Offset nearestPos = positions[random.nextInt(positions.length)];
+
+//           // Random angle and distance from nearest circle
+//           double angle = random.nextDouble() * 2 * pi;
+//           double distance =
+//               minDistance + (random.nextDouble() * 100 * clusterTightness);
+
+//           candidate = Offset(
+//             nearestPos.dx + distance * cos(angle),
+//             nearestPos.dy + distance * sin(angle),
+//           );
+//         }
+
+//         // Check collision with existing circles
+//         bool hasCollision = false;
+//         for (Offset existingPos in positions) {
+//           double distance = (candidate - existingPos).distance;
+//           if (distance < minDistance) {
+//             hasCollision = true;
+//             break;
+//           }
+//         }
+
+//         if (!hasCollision) {
+//           newPosition = candidate;
+//         }
+
+//         attempts++;
+//       }
+
+//       // Fallback: place in grid if no position found
+//       if (newPosition == null) {
+//         int row = i ~/ itemsPerRow;
+//         int col = i % itemsPerRow;
+//         newPosition = Offset(
+//           500 + col * minDistance * 1.2,
+//           500 + row * minDistance * 1.2,
+//         );
+//       }
+
+//       positions.add(newPosition);
+//     }
+
+//     return positions;
+//   }
+
+//   Widget _buildForYouTab() {
+//     return Recomandedgroups();
+//   }
+// }

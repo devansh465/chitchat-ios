@@ -567,6 +567,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void dispose() {
     _notificationTimer?.cancel();
+    NotificationService.clearAllUnreadNotifications();
+
     super.dispose();
   }
 

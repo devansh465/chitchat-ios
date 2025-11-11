@@ -160,6 +160,32 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     }
   }
 
+  void _handlePostUpdate(value) {
+    print("Posts updated from AppVariables listener $value");
+    if (mounted) {
+      setState(() {
+        posts.insert(0, value);
+      });
+    }
+  }
+
+  void _handleMemoryUpdate(value) {
+    print("Memories updated from AppVariables listener $value");
+    if (mounted) {
+      setState(() {
+        remoteMemories.insert(
+            0,
+            MemoryItem(
+              url: value['media'][0]['url'],
+              type: value['media'][0]['type'].contains("video")
+                  ? MessageType.video
+                  : MessageType.image,
+              isLocal: false,
+            ));
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -175,6 +201,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     _tabController = TabController(length: 2, vsync: this);
     AppVariables.registerState(this);
     AppVariables.addListener("profile", _handleProfileUpdate);
+    AppVariables.addListener("group_posts", _handlePostUpdate);
+    AppVariables.addListener("memories", _handleMemoryUpdate);
     _tabController.addListener(() {
       setState(() {
         selectedTab = _tabController.index;
@@ -578,7 +606,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     _refreshTimer?.cancel();
 
     AppVariables.unregisterState(this);
-    AppVariables.removeListener("posts", _handleProfileUpdate);
+    AppVariables.removeListener("profile", _handleProfileUpdate);
+    AppVariables.removeListener("group_posts", _handlePostUpdate);
     super.dispose();
   }
 

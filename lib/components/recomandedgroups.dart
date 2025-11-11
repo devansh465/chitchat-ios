@@ -77,31 +77,34 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
           ),
           child: Column(
             children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
-                child: TextField(
-                  style: TextStyle(color: Colors.black),
-                  decoration: InputDecoration(
-                    hintText: 'Search friend circles...',
-                    hintStyle: TextStyle(color: Colors.black54),
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color.fromARGB(255, 255, 255, 255),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide(color: Colors.grey[800]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    // Add search functionality here
-                  },
-                ),
+              SizedBox(
+                height: 20,
               ),
+              // Padding(
+              //   padding:
+              //       const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+              //   child: TextField(
+              //     style: TextStyle(color: Colors.black),
+              //     decoration: InputDecoration(
+              //       hintText: 'Search friend circles...',
+              //       hintStyle: TextStyle(color: Colors.black54),
+              //       prefixIcon: Icon(Icons.search, color: Colors.grey),
+              //       filled: true,
+              //       fillColor: const Color.fromARGB(255, 255, 255, 255),
+              //       enabledBorder: OutlineInputBorder(
+              //         borderRadius: BorderRadius.circular(30),
+              //         borderSide: BorderSide(color: Colors.grey[800]!),
+              //       ),
+              //       focusedBorder: OutlineInputBorder(
+              //         borderRadius: BorderRadius.circular(30),
+              //         borderSide: BorderSide(color: Colors.blue),
+              //       ),
+              //     ),
+              //     onChanged: (value) {
+              //       // Add search functionality here
+              //     },
+              //   ),
+              // ),
               SizedBox(
                 height: 10,
               ),

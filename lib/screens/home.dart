@@ -12,6 +12,7 @@ import 'package:chitchat/services/chats.dart';
 import 'package:chitchat/services/story.dart';
 import 'package:deep_link_router/deep_link_router.dart';
 import 'package:event_handeler/event_handeler.dart';
+import 'package:shimmer/shimmer.dart';
 import "package:story_view/story_view.dart";
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
@@ -51,7 +52,8 @@ class _HomePageState extends State<HomePage> {
       AppVariables.get<Map<String, dynamic>>('profile');
 
   bool _isLoading = false;
-  final List<dynamic> _feedItems = [];
+  bool _isRefreshing = false;
+  List<dynamic> _feedItems = [];
   StreamSubscription? _subscription;
   Future<void> _handelDeepLinks() async {
     Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
@@ -297,6 +299,37 @@ class _HomePageState extends State<HomePage> {
   bool hasMore = true;
   String? lastSeenPostId;
   int page = 1;
+  Future<void> _refreshItems({String? invalidate}) async {
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      final response = await FeedService.fetchFeed(
+          page: page,
+          limit: 10,
+          lastSeenPostId: null,
+          invalidateCache: invalidate);
+
+      setState(() {
+        _feedItems = response["posts"];
+        hasMore = response["hasMore"];
+
+        // Update lastSeenPostId for pagination
+        if (_feedItems.isNotEmpty) {
+          lastSeenPostId = _feedItems.last["_id"];
+          page++;
+        }
+      });
+    } catch (e) {
+      print("Error: $e");
+    } finally {
+      setState(() {
+        _isRefreshing = false;
+      });
+    }
+  }
+
   Future<void> _loadMoreItems({String? invalidate}) async {
     if (!hasMore || _isLoading) return; // Stop fetching if no more data
 
@@ -369,7 +402,7 @@ class _HomePageState extends State<HomePage> {
       child: Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
-            _loadMoreItems(invalidate: "true");
+            _refreshItems(invalidate: "true");
             _getStories();
             _getMyStories(invalidate: true);
           },
@@ -378,69 +411,69 @@ class _HomePageState extends State<HomePage> {
             slivers: [
               _buildAppBar(),
               SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: SizedBox(
-                        height: 130,
-                        child: Row(
-                          children: [
-                            _StoryItem(
-                              onTap: () {
-                                if (myStories.isNotEmpty) {
-                                  Navigator.push(
-                                    context,
-                                    PageTransition(
-                                      isIos: true,
-                                      type: PageTransitionType.rightToLeft,
-                                      child: StoryViewScreen(
-                                        storyItems: myStories,
-                                        initialIndex: 0,
-                                      ),
-                                      curve: Curves.fastEaseInToSlowEaseOut,
-                                      duration:
-                                          const Duration(milliseconds: 500),
+                child: SizedBox(
+                  height: 170,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    itemCount: userStories.length + 1, // +1 for "Me"
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        // --- My Story ---
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: _StoryItem(
+                            clicked_index: 0,
+                            onTap: () {
+                              if (myStories.isNotEmpty) {
+                                Navigator.push(
+                                  context,
+                                  PageTransition(
+                                    isIos: true,
+                                    type: PageTransitionType.rightToLeft,
+                                    child: StoryViewScreen(
+                                      storyItems: myStories,
+                                      initialIndex: "Me",
                                     ),
-                                  );
-                                  return;
-                                } else {
-                                  show(context);
-                                  return;
-                                }
-                              },
-                              userStory: UserStory(
-                                dbIndex: 0,
-                                id: "__",
-                                username: "Me",
-                                name: "Me",
-                                user: profileDetails?["_id"] ?? "__",
-                                media: [],
-                                views: [],
-                                visibleTo: "me",
-                                date: DateTime.now(),
-                                profilePic: profileDetails?["profilePic"] ??
-                                    "https://unsplash.it/200/300",
-                              ),
-                              stories: myStories,
+                                    curve: Curves.fastEaseInToSlowEaseOut,
+                                    duration: const Duration(milliseconds: 500),
+                                  ),
+                                );
+                              } else {
+                                show(context);
+                              }
+                            },
+                            userStory: UserStory(
+                              dbIndex: 0,
+                              id: "__",
+                              username: "Me",
+                              name: "Me",
+                              user: profileDetails?["_id"] ?? "__",
+                              media: [],
+                              views: [],
+                              visibleTo: "me",
+                              date: DateTime.now(),
+                              profilePic: profileDetails?["profilePic"] ??
+                                  "https://unsplash.it/200/300",
                             ),
-                            const VerticalDivider(
-                              color: Color.fromARGB(255, 101, 101, 101),
-                              thickness: 1,
-                              width: 20,
-                              indent: 10,
-                              endIndent: 40,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    userStories.isNotEmpty
-                        ? Expanded(child: _buildStories())
-                        : const SizedBox(
-                            height: 10,
+                            stories: myStories,
                           ),
-                  ],
+                        );
+                      } else {
+                        // --- Other users' stories ---
+                        final userStory = userStories[index - 1];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: _StoryItem(
+                            clicked_index: index - 1,
+                            // onTap: () => openStory(userStory),
+                            userStory: userStory,
+                            stories: userStories, //all stories,
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ),
               ),
               _buildFeed(),
@@ -705,20 +738,47 @@ class _HomePageState extends State<HomePage> {
         left: 5,
       ),
       child: SizedBox(
-        height: 130,
+        height: 170,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: userStories.length,
           itemBuilder: (context, index) => _StoryItem(
-            userStory: userStories[index],
-            stories: userStories,
-          ),
+              userStory: userStories[index],
+              stories: userStories,
+              clicked_index: index),
         ),
       ),
     );
   }
 
   Widget _buildFeed() {
+    if (_isRefreshing) {
+      // 🔹 Show shimmer placeholders
+      return SliverPadding(
+        padding: const EdgeInsets.all(8),
+        sliver: SliverMasonryGrid.count(
+          crossAxisCount: 2,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          childCount: 6, // number of shimmer placeholders
+          itemBuilder: (context, index) {
+            return Shimmer.fromColors(
+              baseColor: AppColors.background,
+              highlightColor: Colors.grey.shade100,
+              child: Container(
+                height: 220 + (index % 3) * 30, // random varied heights
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // 🔹 Normal feed
     return SliverPadding(
       padding: const EdgeInsets.all(8),
       sliver: SliverMasonryGrid.count(
@@ -780,13 +840,19 @@ class _StoryItem extends StatelessWidget {
   final UserStory userStory;
   final List<UserStory> stories;
   final Function? onTap;
+  final int clicked_index;
 
   const _StoryItem(
-      {required this.userStory, required this.stories, this.onTap, super.key});
+      {required this.userStory,
+      required this.stories,
+      this.onTap,
+      required this.clicked_index,
+      super.key});
   List<UserStory> filterStories() {
     return stories
         .where((story) =>
-            story.getColor().toString() == userStory.getColor().toString())
+            (story.getColor().toString() == userStory.getColor().toString()) &&
+            (story.username == userStory.username))
         .toList();
   }
 
@@ -798,6 +864,7 @@ class _StoryItem extends StatelessWidget {
           onTap!();
           return;
         }
+        print("Story clicked: ${userStory.username} at index $clicked_index");
         Navigator.push(
           context,
           PageTransition(
@@ -805,7 +872,7 @@ class _StoryItem extends StatelessWidget {
             type: PageTransitionType.rightToLeft,
             child: StoryViewScreen(
               storyItems: filterStories(),
-              initialIndex: 0,
+              initialIndex: userStory.username,
             ),
             curve: Curves.fastEaseInToSlowEaseOut,
             duration: const Duration(milliseconds: 500),
@@ -817,6 +884,8 @@ class _StoryItem extends StatelessWidget {
         child: Column(
           children: [
             Container(
+              width: 67,
+              height: 80,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 // gradient: LinearGradient(
@@ -827,25 +896,39 @@ class _StoryItem extends StatelessWidget {
                 //   ],
                 // ),
                 color: userStory.isViewed ? Colors.grey : userStory.getColor(),
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(40),
               ),
               child: Stack(
                 children: [
                   Container(
+                    width: 67,
+                    height: 80,
                     padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: Color(0xFF121212),
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(40),
                     ),
-                    child: CachedNetworkImage(
-                      imageUrl: userStory.profilePic,
-                      imageBuilder: (context, imageProvider) => CircleAvatar(
-                        radius: 35,
-                        backgroundImage: imageProvider,
-                      ),
-                      placeholder: (context, url) => const CircleAvatar(
-                        radius: 35,
-                        backgroundColor: Color(0xFF2A2A2A),
+                    child: ClipRRect(
+                      clipBehavior: Clip.antiAlias,
+                      child: CachedNetworkImage(
+                        width: 67,
+                        height: 80,
+                        imageUrl: userStory.profilePic,
+                        imageBuilder: (context, imageProvider) => ClipRRect(
+                          borderRadius: BorderRadius.circular(35),
+                          child: Image(
+                            image: imageProvider,
+                            width: 67,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        placeholder: (context, url) => ClipRRect(
+                          borderRadius: BorderRadius.circular(35),
+                          child: ColoredBox(
+                            color: Color(0xFF2A2A2A),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -856,14 +939,43 @@ class _StoryItem extends StatelessWidget {
                         child: Icon(
                           Icons.add_circle_outlined,
                           color: AppColors.surface,
-                          size: 30,
+                          size: 25,
                         ))
                 ],
               ),
             ),
             const SizedBox(height: 4),
+            // Small bars at bottom (status indicators)
+            ...[
+              Column(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: userStory.isViewed
+                          ? Colors.grey
+                          : userStory.getColor(),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    width: 15,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: userStory.isViewed
+                          ? Colors.grey
+                          : userStory.getColor(),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
             Text(
-              "${userStory.username}",
+              userStory.username,
               style: const TextStyle(fontSize: 12),
             ),
           ],
