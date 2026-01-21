@@ -920,6 +920,8 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
 // ValueNotifiers for reactive updates
 
   ValueNotifier<double> votesNotifier = ValueNotifier<double>(0);
+  bool _hasInitializedVotes =
+      false; // Track if votes have been initialized from API
 
   int get totalMembers {
     return notificationsNotifier.value.isNotEmpty
@@ -966,8 +968,11 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        // _notifications = notifications;
-        votesNotifier.value = notifications.last.votes.toDouble();
+        // Only initialize votesNotifier once from API data
+        if (!_hasInitializedVotes) {
+          votesNotifier.value = notifications.last.votes.toDouble();
+          _hasInitializedVotes = true;
+        }
         return _buildvotingSectionUI();
       },
     );
@@ -1256,6 +1261,8 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                     PostService.deletePost(widget.postId).then((result) {
                       Navigator.of(context).pop(); // Close loader
                       if (result['success'] == true) {
+                        // Notify listeners to remove the post from UI
+                        AppVariables.update('deleted_posts', widget.postId);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               backgroundColor: Colors.green,

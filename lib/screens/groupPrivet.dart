@@ -204,6 +204,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     }
   }
 
+  void _handlePostDelete(value) {
+    print("Post deleted from AppVariables listener: $value");
+    if (mounted) {
+      setState(() {
+        posts.removeWhere((post) => post['_id'] == value);
+      });
+    }
+  }
+
   void shareGroupInvitation() {
     SharePlus.instance.share(ShareParams(
       title: "ChitChat Group Invitation",
@@ -234,6 +243,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     AppVariables.addListener("profile", _handleProfileUpdate);
     AppVariables.addListener("group_posts", _handlePostUpdate);
     AppVariables.addListener("memories", _handleMemoryUpdate);
+    AppVariables.addListener("deleted_posts", _handlePostDelete);
     _tabController.addListener(() {
       setState(() {
         selectedTab = _tabController.index;
@@ -635,6 +645,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     AppVariables.removeListener("profile", _handleProfileUpdate);
     AppVariables.removeListener("group_posts", _handlePostUpdate);
     AppVariables.removeListener("memories", _handleMemoryUpdate);
+    AppVariables.removeListener("deleted_posts", _handlePostDelete);
     super.dispose();
   }
 

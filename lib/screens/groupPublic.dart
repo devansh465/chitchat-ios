@@ -47,6 +47,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
   FriendCircleGroup? groupDetails;
 
   int selectedTab = 0;
+  String? expandedMemberId; // Track which member's bio is expanded
 
   late Collection chats;
   int windowSize = 20;
@@ -90,9 +91,9 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
     super.initState();
     _getGroupDetails().then((x) {
       _fetchPosts();
+      _getUserLikes();
     });
 
-    _getUserLikes();
     _tabController = TabController(length: 1, vsync: this);
     AppVariables.registerState(this);
 
@@ -490,121 +491,226 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                     itemCount: groupDetails!.members.length,
                     itemBuilder: (context, index) {
                       final member = groupDetails!.members[index];
-                      print(
-                          'Member ${member.id}: ${member.avatarUrl} ${member.additionalData['memberName']}');
-                      return ListTile(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              PageTransition(
-                                type: PageTransitionType.rightToLeft,
-                                child: PublicProfilePage(
-                                  dbIndex: member.additionalData['dbIndex']
-                                      .toString(),
-                                  uid: member.id,
-                                ),
-                              ),
-                            );
-                          },
-                          leading: CircleAvatar(
-                            radius: 25,
-                            backgroundImage: NetworkImage(member.avatarUrl),
-                          ),
-                          title: Text(
-                            member.additionalData['memberName'],
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          subtitle: GestureDetector(
+                      final isExpanded = expandedMemberId == member.id;
+                      final List<dynamic> rawBios =
+                          member.additionalData['memberBio'] as List? ?? [];
+
+                      // Build latest bio by user
+                      final Map<String, UserBio> latestBioByUser = {};
+                      for (final bioEntry in rawBios) {
+                        final parsedBio = GroupsService.parseBio(bioEntry);
+                        if (parsedBio.editedBy != null &&
+                            parsedBio.editedBy!.isNotEmpty) {
+                          latestBioByUser[parsedBio.editedBy!] = parsedBio;
+                        }
+                      }
+
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
                             onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  final bioList =
-                                      member.additionalData['memberBio'] ?? [];
-                                  bioList.removeWhere((bio) => bio == null);
-                                  return AlertDialog(
-                                    backgroundColor: AppColors.background,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(20)),
-                                    title: Row(
-                                      children: [
-                                        Icon(Icons.info_outline,
-                                            color: AppColors.textSecondary),
-                                        SizedBox(width: 8),
-                                        Text('Bio History',
-                                            style: TextStyle(
-                                                fontFamily: "Poppins",
-                                                color: AppColors.primary)),
-                                      ],
-                                    ),
-                                    content: bioList.isEmpty
-                                        ? Text("No bio available.",
-                                            style: TextStyle(
-                                                fontFamily: "Poppins",
-                                                color: AppColors.success))
-                                        : SizedBox(
-                                            width: double.maxFinite,
-                                            child: ListView.separated(
-                                              shrinkWrap: true,
-                                              itemCount: bioList.length,
-                                              separatorBuilder: (_, __) =>
-                                                  Divider(),
-                                              itemBuilder: (context, idx) {
-                                                final bioObj =
-                                                    GroupsService.parseBio(
-                                                        bioList[idx]);
-                                                return ListTile(
-                                                  title: Text(
-                                                    bioObj.bio ?? "No bio",
-                                                    style: TextStyle(
-                                                        fontFamily: "Poppins",
-                                                        color: Colors.white),
-                                                  ),
-                                                  subtitle: Text(
-                                                    "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[700],
-                                                      fontFamily: "Poppins",
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                    actions: [
-                                      TextButton(
-                                        child: Text('Close',
-                                            style: TextStyle(
-                                                fontFamily: "Poppins",
-                                                color: AppColors.primary)),
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(),
-                                      ),
-                                    ],
-                                  );
-                                },
+                              Navigator.push(
+                                context,
+                                PageTransition(
+                                  type: PageTransitionType.rightToLeft,
+                                  child: PublicProfilePage(
+                                    dbIndex: member.additionalData['dbIndex']
+                                        .toString(),
+                                    uid: member.id,
+                                  ),
+                                ),
                               );
                             },
-                            child: Text(
-                              member.additionalData['memberBio'].length > 0
-                                  ? "#${GroupsService.parseBio(member.additionalData['memberBio'].last).editedBy} ${GroupsService.parseBio(member.additionalData['memberBio'].last).bio}"
-                                  : 'No bio available',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary,
-                                  fontFamily: "Poppins"),
-                              textAlign: TextAlign.left,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      // Avatar (no online status for public view)
+                                      CircleAvatar(
+                                        radius: 25,
+                                        backgroundImage:
+                                            NetworkImage(member.avatarUrl),
+                                      ),
+                                      const SizedBox(width: 12),
+
+                                      // Name and bio toggle
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              member
+                                                  .additionalData['memberName'],
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            InkWell(
+                                              onTap: () {
+                                                setState(() {
+                                                  if (isExpanded) {
+                                                    expandedMemberId = null;
+                                                  } else {
+                                                    expandedMemberId =
+                                                        member.id;
+                                                  }
+                                                });
+                                              },
+                                              child: Row(
+                                                children: [
+                                                  const Text(
+                                                    'bio',
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Icon(
+                                                    isExpanded
+                                                        ? Icons
+                                                            .keyboard_arrow_up
+                                                        : Icons
+                                                            .keyboard_arrow_down,
+                                                    color: Colors.grey,
+                                                    size: 20,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Like button with API-fetched like count
+                                      LikeButton(
+                                        buttonType: ButtonType.user,
+                                        postId: member.id,
+                                        initialLikes:
+                                            likeCountForMember[member.id] ??
+                                                member
+                                                    .additionalData['likes'] ??
+                                                0,
+                                        initiallyLiked:
+                                            likeStatus[member.id] ?? false,
+                                        showLikeCount: true,
+                                        onLikeChanged: (isLiked) async {
+                                          bool result =
+                                              await toggleLike(member.id);
+                                          return result;
+                                        },
+                                      ),
+                                    ],
+                                  ),
+
+                                  // Expanded bio section (read-only for public view)
+                                  AnimatedCrossFade(
+                                    firstChild: const SizedBox.shrink(),
+                                    secondChild: Container(
+                                      width: double.infinity,
+                                      margin: EdgeInsets.only(
+                                          top: 12,
+                                          left: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color.fromARGB(
+                                            255, 30, 30, 60),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (latestBioByUser.isNotEmpty)
+                                            ...latestBioByUser.values
+                                                .map<Widget>((parsedBio) {
+                                              return Container(
+                                                margin: const EdgeInsets.only(
+                                                    bottom: 8),
+                                                padding:
+                                                    const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromARGB(
+                                                      255, 25, 25, 55),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: Wrap(
+                                                  children: [
+                                                    RichText(
+                                                        text: TextSpan(
+                                                      children: [
+                                                        TextSpan(
+                                                          text: parsedBio
+                                                                  .editedBy ??
+                                                              '',
+                                                          style:
+                                                              const TextStyle(
+                                                            color: Colors.blue,
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                        const WidgetSpan(
+                                                            child: SizedBox(
+                                                                width: 6)),
+                                                        TextSpan(
+                                                          text: parsedBio.bio ??
+                                                              '',
+                                                          style:
+                                                              const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 14,
+                                                          ),
+                                                        )
+                                                      ],
+                                                    )),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList()
+                                          else
+                                            const Text(
+                                              'No bio yet',
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 14,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    crossFadeState: isExpanded
+                                        ? CrossFadeState.showSecond
+                                        : CrossFadeState.showFirst,
+                                    duration: const Duration(milliseconds: 300),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          trailing: LikeButton(
-                              postId: member.id,
-                              buttonType: ButtonType.user,
-                              initialLikes: member.additionalData['likes'] ?? 0,
-                              initiallyLiked: false,
-                              onLikeChanged: (bool x) =>
-                                  toggleLike(member.id)));
+                        ),
+                      );
                     },
                   ),
                 ),
