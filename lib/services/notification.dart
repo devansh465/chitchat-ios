@@ -441,7 +441,8 @@ class NotificationService {
   }
 
   // Vote function
-  static Future<bool> vote(BuildContext context, String voteId) async {
+  static Future<bool> vote(BuildContext context, String voteId,
+      {required Function onRefresh}) async {
     try {
       showLoader(context);
       String? accessToken = await UserService.getAccessToken();
@@ -464,7 +465,7 @@ class NotificationService {
         showPopup(
           context,
           data["message"] ?? "User is now in your group",
-          onRefresh: () => Navigator.of(context).pop(), // Refresh group
+          onRefresh: () => onRefresh(), // Refresh group
         );
         return true;
       } else if (data["message"] == "You have already voted for this group") {

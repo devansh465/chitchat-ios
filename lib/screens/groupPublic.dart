@@ -999,7 +999,11 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                                         post['authorName'],
                                                     profilePic:
                                                         post['profilePic'],
+                                                    isGroupPost:
+                                                        post['isGroupPost'] ??
+                                                            false,
                                                     likes: post['likes'],
+                                                    comments: post['comments'],
                                                   );
                                                 } on Exception catch (e) {
                                                   return Container();

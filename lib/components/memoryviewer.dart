@@ -62,6 +62,16 @@ class _MemoryViewerState extends State<MemoryViewer> {
     final int currentIndex = _controller.page!.round();
     final MemoryItem currentMemory = widget.memories[currentIndex];
 
+    final profile = AppVariables.get<Map<String, dynamic>>('profile');
+    if (profile == null || profile['myGroup'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not find group information.')),
+      );
+      return;
+    }
+
+    final String groupId = profile['myGroup']['_id'];
+
     setState(() {
       _isTogglingPublic = true;
     });
@@ -81,7 +91,6 @@ class _MemoryViewerState extends State<MemoryViewer> {
       });
       // Persist the public status locally
       AppVariables.setPersistent(currentMemory.url, currentMemory.isPublic);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -90,6 +99,21 @@ class _MemoryViewerState extends State<MemoryViewer> {
                 : 'Memory is now private'),
           ),
         );
+      }
+      if (currentMemory.isPublic) {
+        Map<String, dynamic> result = await PostService.createPost(
+            files: [currentMemory.url], isGroupPost: true, myGroupId: groupId);
+        if (result['success']) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(currentMemory.isPublic
+                    ? 'Memory is now public and added to your Group posts'
+                    : 'Memory is now private and added to your Group posts'),
+              ),
+            );
+          }
+        }
       }
     } else {
       if (mounted) {

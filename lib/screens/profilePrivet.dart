@@ -679,9 +679,11 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                       postId: post['_id'],
                                       author: post['author'],
                                       group: post['group'],
+                                      isGroupPost: post['isGroupPost'] ?? false,
                                       authorName: post['authorName'],
                                       profilePic: post['profilePic'],
                                       likes: post['likes'],
+                                      comments: post['comments'],
                                     );
                                   } on Exception catch (e) {
                                     return Container();

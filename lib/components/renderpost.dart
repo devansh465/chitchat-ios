@@ -29,13 +29,17 @@ class DynamicPostWidget extends StatefulWidget {
   final String postId;
   final String author;
   final String group;
+  final bool? isGroupPost;
   final String? authorName;
   final String? profilePic;
   final double borderRadius;
   final int likes;
+  final int comments;
   final bool? showAuthor;
   final bool? showCount;
+  final bool? showMenu;
   final bool? public;
+  final Function? onRefresh;
 
   DynamicPostWidget({
     required this.content,
@@ -47,9 +51,13 @@ class DynamicPostWidget extends StatefulWidget {
     this.profilePic,
     this.borderRadius = 12,
     this.likes = 0,
+    this.comments = 0,
     this.showAuthor = false,
     this.showCount = false,
     this.public = true,
+    this.showMenu = false,
+    this.onRefresh,
+    this.isGroupPost,
   });
 
   @override
@@ -148,7 +156,6 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
       List<String> files =
           await uploader.uploadFiles(files: images, compressionParams: {
         'width': 600,
-        'quality': 85,
       });
       print(files);
       _progressNotifier.value = _progressNotifier.value.copyWith(
@@ -440,6 +447,13 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                 profilePic: widget.profilePic ?? "",
                                 authorName: widget.authorName ?? "",
                                 scrollController: scrollController,
+                                isGroupPost: widget.isGroupPost,
+                                showMoreButton:
+                                    widget.showMenu != null && widget.showMenu!
+                                        ? () {
+                                            _openMore(context);
+                                          }
+                                        : null,
                                 middleItem: Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -481,7 +495,10 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                                   color: Colors.white),
                                               const SizedBox(width: 4),
                                               Text(
-                                                comments.length.toString(),
+                                                comments.isNotEmpty
+                                                    ? comments.length.toString()
+                                                    : widget.comments
+                                                        .toString(),
                                                 style: const TextStyle(
                                                     color: Colors.white,
                                                     fontSize: 14),
@@ -925,12 +942,18 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
   void _handleVote() async {
     votesNotifier.value += 1;
     bool success = await NotificationService.vote(
-        context, notificationsNotifier.value.last.id);
+        context, notificationsNotifier.value.last.id, onRefresh: () {
+      if (widget.onRefresh != null) {
+        widget.onRefresh!(widget.postId);
+      }
+      setState(() {
+        notificationsNotifier.value = notificationsNotifier.value;
+      });
+    });
     if (!success) {
       votesNotifier.value -= 1; // Revert if vote failed
     }
     print("valuenotier==== ${votesNotifier.value}, sucess =$success");
-    // widget.onVote(widget.notification.id);
   }
 
   Widget _buildVotingSection() {
@@ -1273,9 +1296,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onLongPress: () {
-        _openMore(context);
-      },
+      behavior: HitTestBehavior.translucent,
       onTap: () => _openBottomSheet(context),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -1421,6 +1442,30 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                       ),
                     ),
                   )),
+            if (widget.showMenu != null &&
+                widget.showMenu == true &&
+                widget.public == false)
+              Positioned(
+                  bottom: 5,
+                  right: 5,
+                  child: GestureDetector(
+                    onTap: () {
+                      _openMore(context);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.more_vert, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ))
           ],
         ),
       ),

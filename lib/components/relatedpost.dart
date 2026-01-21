@@ -20,7 +20,9 @@ class RelatedPostsWidget extends StatefulWidget {
   final String authorId;
   final String authorName;
   final String profilePic;
+  final bool? isGroupPost;
   final Widget middleItem;
+  final Function()? showMoreButton;
 
   const RelatedPostsWidget(
       {Key? key,
@@ -29,6 +31,8 @@ class RelatedPostsWidget extends StatefulWidget {
       required this.authorId,
       required this.profilePic,
       required this.middleItem,
+      this.showMoreButton,
+      this.isGroupPost = false,
       required this.authorName})
       : super(key: key);
 
@@ -249,7 +253,9 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
         group: post['group']?.toString() ?? '',
         authorName: post['authorName']?.toString() ?? '',
         profilePic: post['profilePic']?.toString() ?? '',
+        isGroupPost: post['isGroupPost'] ?? false,
         likes: (post['likes'] ?? 0) as int,
+        comments: (post['comments'] ?? 0) as int,
       ),
     );
   }
@@ -551,6 +557,137 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
     );
   }
 
+  Widget _buildUserInfoForGroup() {
+    String? educationField = "Shared Group Memories";
+    String displayEducation = _formatEducationTextTwoLine(educationField);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          PageTransition(
+            type: PageTransitionType.rightToLeft,
+            child: GroupPublicViewScreen(groupId: group!.groupId),
+          ),
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withValues(alpha: 0.4),
+                  Colors.black.withValues(alpha: 0.2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 1,
+              ),
+            ),
+            child: IntrinsicWidth(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Profile Picture with subtle glow
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundImage:
+                          group!.groupData["GroupProfilePic"] != null
+                              ? CachedNetworkImageProvider(
+                                  group!.groupData["GroupProfilePic"]!)
+                              : null,
+                      child: group!.groupData["GroupProfilePic"] != null
+                          ? null
+                          : const Icon(Icons.person,
+                              size: 18, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Text information with better layout
+                  Flexible(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Name with elegant styling
+                        Text(
+                          group!.groupData["name"].length > 25
+                              ? '${group!.groupData["name"].substring(0, 22)}...'
+                              : group!.groupData["name"],
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 1),
+                                blurRadius: 2.0,
+                                color: Colors.black.withValues(alpha: 0.6),
+                              ),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 12),
+
+                        if (displayEducation.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          // Education with smart formatting - supports two lines
+                          Text(
+                            displayEducation,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.blue[200],
+                              letterSpacing: 0.2,
+                              height: 1.3,
+                              shadows: [
+                                Shadow(
+                                  offset: const Offset(0, 1),
+                                  blurRadius: 2.0,
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                ),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.start,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 // Helper method for two-line education display
   String _formatEducationTextTwoLine(String? educationField) {
     if (educationField == null || educationField.isEmpty) return "";
@@ -666,7 +803,31 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
                 padding: const EdgeInsets.only(left: 10, right: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.start,
-                  children: [_buildUserInfo()],
+                  children: [
+                    widget.isGroupPost != null && widget.isGroupPost!
+                        ? _buildUserInfoForGroup()
+                        : _buildUserInfo(),
+                    const Spacer(),
+                    if (widget.showMoreButton != null)
+                      GestureDetector(
+                        onTap: () {
+                          widget.showMoreButton?.call();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.more_vert, color: Colors.white),
+                            ],
+                          ),
+                        ),
+                      )
+                  ],
                 ),
               ),
               widget.middleItem,

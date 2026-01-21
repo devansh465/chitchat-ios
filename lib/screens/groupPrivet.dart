@@ -342,6 +342,16 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     }
   }
 
+  void updatePublicPostStatus(postid) {
+    posts.map((e) {
+      if (e['_id'] == postid) {
+        e['public'] = !e['public'];
+      }
+      return e;
+    });
+    setState(() {});
+  }
+
   void _getUserLikes() async {
     var _userLikes = await AppVariables.getPersistent<Map<String, bool>>(
         'likeStatusForMember');
@@ -753,6 +763,20 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               itemBuilder: (context, index) {
                 final member = groupDetails!.members[index];
                 final isExpanded = expandedMemberId == member.id;
+                final List<dynamic> rawBios =
+                    member.additionalData['memberBio'] as List;
+
+                final Map<String, UserBio> latestBioByUser = {};
+
+                for (final bioEntry in rawBios) {
+                  final parsedBio = GroupsService.parseBio(bioEntry);
+
+                  if (parsedBio.editedBy != null &&
+                      parsedBio.editedBy!.isNotEmpty) {
+                    // This overwrites older entries → keeps the LAST one
+                    latestBioByUser[parsedBio.editedBy!] = parsedBio;
+                  }
+                }
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
@@ -926,10 +950,10 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                             is List &&
                                         member.additionalData['memberBio']
                                             .isNotEmpty)
-                                      ...member.additionalData['memberBio']
-                                          .map<Widget>((bioEntry) {
-                                        final parsedBio =
-                                            GroupsService.parseBio(bioEntry);
+                                      // ...member.additionalData['memberBio']
+                                      //     .map<Widget>((bioEntry) {
+                                      ...latestBioByUser.values
+                                          .map<Widget>((parsedBio) {
                                         return Container(
                                           margin:
                                               const EdgeInsets.only(bottom: 8),
@@ -1221,7 +1245,11 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                     authorName: post['authorName'],
                                     profilePic: post['profilePic'],
                                     likes: post['likes'],
+                                    isGroupPost: post['isGroupPost'] ?? false,
                                     public: post['public'],
+                                    comments: post['comments'],
+                                    onRefresh: updatePublicPostStatus,
+                                    showMenu: true,
                                   );
                                 } on Exception catch (e) {
                                   return Container();

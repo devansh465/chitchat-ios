@@ -329,9 +329,11 @@ class _NotificationCardState extends State<NotificationCard> {
           postId: widget.notification.requestBody['id'] ?? '',
           author: widget.notification.requestBody['author'],
           group: widget.notification.requestBody['group'] ?? '',
+          isGroupPost: widget.notification.requestBody['isGroupPost'] ?? false,
           authorName: widget.notification.requestBody['authorName'],
           profilePic: widget.notification.requestBody['profilePic'],
           likes: widget.notification.requestBody['likes'] ?? 0,
+          comments: widget.notification.requestBody['comments'] ?? 0,
         ),
       ),
     );
@@ -545,7 +547,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     if (_voted.contains(id)) {
       return;
     }
-    bool res = await NotificationService.vote(context, id);
+    bool res = await NotificationService.vote(context, id, onRefresh: () {
+      _getGroupJoinReqests();
+      _getNotification();
+    });
     setState(() {
       _notifications = _notifications.map((n) {
         if (n.id == id && res) {

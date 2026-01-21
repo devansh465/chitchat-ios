@@ -1513,7 +1513,7 @@ class _OptionSelectorState extends State<_OptionSelector> {
                         context,
                         PageTransition(
                           type: PageTransitionType.leftToRight,
-                          child: ChatScreen(data: [widget.uri.toString()]),
+                          child: ChatScreen(data: widget.uri),
                         ),
                         (route) => route.isFirst);
                   },
