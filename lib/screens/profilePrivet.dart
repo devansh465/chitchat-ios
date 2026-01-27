@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
@@ -44,6 +45,25 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       setState(() {
         posts.add(value);
       });
+    }
+  }
+
+  String? _getEducationField(Map<String, dynamic> member) {
+    // Get the enum value
+    final level = member['educationLevel'] as String?;
+    if (level == null) return null;
+
+    switch (level) {
+      case "School":
+        return member['school'] as String?;
+      case "College":
+        return member['college'] as String?;
+      case "University":
+        return member['university'] as String?;
+      case "Passout":
+        return member['year']?.toString(); // maybe year or some graduation info
+      default:
+        return "";
     }
   }
 
@@ -255,6 +275,150 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     }
   }
 
+  Future<void> editProfilePic(BuildContext context) async {
+    final ImagePicker picker = ImagePicker();
+
+    // 1️⃣ Pick image
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
+
+    if (image == null) return;
+
+    final File selectedFile = File(image.path);
+
+    final String baseurl =
+        AppVariables.get<String>('baseurl')?.trim() ?? 'http://localhost:3000';
+
+    final progressNotifier = ValueNotifier<FileUploadProgress>(
+      FileUploadProgress(fileName: 'Uploading profile picture...'),
+    );
+
+    final uploader = S3Uploader(
+      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+      progressNotifier: progressNotifier,
+    );
+
+    bool isUploading = false;
+
+    // 2️⃣ Preview + Upload dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'Update Profile Picture',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: SizedBox(
+                width: 300,
+                child: isUploading
+                    ? UploadProgressWidget(
+                        progressNotifier: progressNotifier,
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              selectedFile,
+                              height: 180,
+                              width: 180,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Do you want to upload this picture?',
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+              ),
+              actions: isUploading
+                  ? null
+                  : [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                        },
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          setState(() {
+                            isUploading = true;
+                          });
+
+                          try {
+                            // 3️⃣ Upload
+                            final urls = await uploader.uploadFiles(
+                              files: [selectedFile],
+                              compressionParams: {
+                                "width": 600,
+                              },
+                            );
+
+                            if (urls.isEmpty) {
+                              throw Exception('Upload failed');
+                            }
+
+                            // 4️⃣ Update backend
+                            final result = await UserService.updateProfilePic(
+                              profilePic: urls.first,
+                            );
+
+                            if (result['success'] != true) {
+                              throw Exception(
+                                result['error'] ?? 'Failed to update profile',
+                              );
+                            }
+
+                            // 5️⃣ Update local state
+                            _getMyprofile();
+
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                              setState(() {});
+                            }
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          } catch (e) {
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    e
+                                        .toString()
+                                        .replaceFirst('Exception: ', ''),
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text('Upload'),
+                      ),
+                    ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -458,7 +622,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                                 return ZoomableImagePopup(
                                                   imageUrl:
                                                       myProfile?['profilePic'],
-                                                  onEdit: null,
+                                                  onEdit: () =>
+                                                      editProfilePic(context),
                                                   onClose: () =>
                                                       Navigator.of(context)
                                                           .pop(),
@@ -527,96 +692,108 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                 ],
                               ),
                             ),
+                            // Padding(
+                            //   padding: const EdgeInsets.symmetric(
+                            //       horizontal: 20, vertical: 10),
+                            //   child: GestureDetector(
+                            //     onTap: () {
+                            //       showDialog(
+                            //         context: context,
+                            //         builder: (BuildContext context) {
+                            //           final bioList = myProfile?['bio'] ?? [];
+                            //           bioList.removeWhere((bio) => bio == null);
+                            //           return AlertDialog(
+                            //             backgroundColor: AppColors.background,
+                            //             shape: RoundedRectangleBorder(
+                            //                 borderRadius:
+                            //                     BorderRadius.circular(20)),
+                            //             title: Row(
+                            //               children: [
+                            //                 Icon(Icons.info_outline,
+                            //                     color: AppColors.textSecondary),
+                            //                 SizedBox(width: 8),
+                            //                 Text('Bio History',
+                            //                     style: TextStyle(
+                            //                         fontFamily: "Poppins",
+                            //                         color: AppColors.primary)),
+                            //               ],
+                            //             ),
+                            //             content: bioList.isEmpty
+                            //                 ? Text("No bio available.",
+                            //                     style: TextStyle(
+                            //                         fontFamily: "Poppins",
+                            //                         color: AppColors.success))
+                            //                 : SizedBox(
+                            //                     width: double.maxFinite,
+                            //                     child: ListView.separated(
+                            //                       shrinkWrap: true,
+                            //                       itemCount: bioList.length,
+                            //                       separatorBuilder: (_, __) =>
+                            //                           Divider(),
+                            //                       itemBuilder: (context, idx) {
+                            //                         final bioObj =
+                            //                             GroupsService.parseBio(
+                            //                                 bioList[idx]);
+                            //                         return ListTile(
+                            //                           title: Text(
+                            //                             bioObj.bio ?? "No bio",
+                            //                             style: TextStyle(
+                            //                                 fontFamily:
+                            //                                     "Poppins",
+                            //                                 color:
+                            //                                     Colors.white),
+                            //                           ),
+                            //                           subtitle: Text(
+                            //                             "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
+                            //                             style: TextStyle(
+                            //                               fontSize: 12,
+                            //                               color:
+                            //                                   Colors.grey[700],
+                            //                               fontFamily: "Poppins",
+                            //                             ),
+                            //                           ),
+                            //                         );
+                            //                       },
+                            //                     ),
+                            //                   ),
+                            //             actions: [
+                            //               TextButton(
+                            //                 child: Text('Close',
+                            //                     style: TextStyle(
+                            //                         fontFamily: "Poppins",
+                            //                         color: AppColors.primary)),
+                            //                 onPressed: () =>
+                            //                     Navigator.of(context).pop(),
+                            //               ),
+                            //             ],
+                            //           );
+                            //         },
+                            //       );
+                            //     },
+                            //     child: Text(
+                            //       myProfile?['bio'].length > 0 &&
+                            //               !(myProfile?['bio'] as List)
+                            //                   .every((bio) => bio == null)
+                            //           ? "#${GroupsService.parseBio(myProfile?['bio'].last).editedBy} ${GroupsService.parseBio(myProfile?['bio'].last).bio}"
+                            //           : 'No bio available',
+                            //       style: TextStyle(
+                            //           fontSize: 14,
+                            //           color: AppColors.background,
+                            //           fontFamily: "Poppins"),
+                            //       textAlign: TextAlign.left,
+                            //     ),
+                            //   ),
+                            // ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 10),
-                              child: GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      final bioList = myProfile?['bio'] ?? [];
-                                      bioList.removeWhere((bio) => bio == null);
-                                      return AlertDialog(
-                                        backgroundColor: AppColors.background,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(20)),
-                                        title: Row(
-                                          children: [
-                                            Icon(Icons.info_outline,
-                                                color: AppColors.textSecondary),
-                                            SizedBox(width: 8),
-                                            Text('Bio History',
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: AppColors.primary)),
-                                          ],
-                                        ),
-                                        content: bioList.isEmpty
-                                            ? Text("No bio available.",
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: AppColors.success))
-                                            : SizedBox(
-                                                width: double.maxFinite,
-                                                child: ListView.separated(
-                                                  shrinkWrap: true,
-                                                  itemCount: bioList.length,
-                                                  separatorBuilder: (_, __) =>
-                                                      Divider(),
-                                                  itemBuilder: (context, idx) {
-                                                    final bioObj =
-                                                        GroupsService.parseBio(
-                                                            bioList[idx]);
-                                                    return ListTile(
-                                                      title: Text(
-                                                        bioObj.bio ?? "No bio",
-                                                        style: TextStyle(
-                                                            fontFamily:
-                                                                "Poppins",
-                                                            color:
-                                                                Colors.white),
-                                                      ),
-                                                      subtitle: Text(
-                                                        "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color:
-                                                              Colors.grey[700],
-                                                          fontFamily: "Poppins",
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                        actions: [
-                                          TextButton(
-                                            child: Text('Close',
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: AppColors.primary)),
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
-                                child: Text(
-                                  myProfile?['bio'].length > 0 &&
-                                          !(myProfile?['bio'] as List)
-                                              .every((bio) => bio == null)
-                                      ? "#${GroupsService.parseBio(myProfile?['bio'].last).editedBy} ${GroupsService.parseBio(myProfile?['bio'].last).bio}"
-                                      : 'No bio available',
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.background,
-                                      fontFamily: "Poppins"),
-                                  textAlign: TextAlign.left,
-                                ),
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                _getEducationField(myProfile ?? {}) ??
+                                    "No education",
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.background,
+                                    fontFamily: "Poppins"),
+                                textAlign: TextAlign.left,
                               ),
                             ),
                             Divider(
@@ -683,6 +860,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                       authorName: post['authorName'],
                                       profilePic: post['profilePic'],
                                       likes: post['likes'],
+                                      showMenu: true,
                                       comments: post['comments'],
                                     );
                                   } on Exception catch (e) {

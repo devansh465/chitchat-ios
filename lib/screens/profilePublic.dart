@@ -22,6 +22,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
 
 import '../components/friendcircle.dart';
+import 'package:chitchat/components/like.dart';
 
 class PublicProfilePage extends StatefulWidget {
   final String dbIndex;
@@ -52,6 +53,10 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   bool isLoadingGroup = true;
   bool isInWatchList = false;
   bool isWatchListLoading = false;
+
+  // Like state management
+  final Map<String, bool> likeStatus = {};
+  final Map<String, int> likeCountForMember = {};
   bool isJoinLoading = false;
 
   // Animation variables for FriendCircle
@@ -62,6 +67,24 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   int currentMaxVisible = 4; // Initial max visible users
   double currentUpperContainerHeightMultiplier = 0.4;
   int currentCircleSize = 200;
+  String? _getEducationField(Map<String, dynamic> member) {
+    // Get the enum value
+    final level = member['educationLevel'] as String?;
+    if (level == null) return null;
+
+    switch (level) {
+      case "School":
+        return member['school'] as String?;
+      case "College":
+        return member['college'] as String?;
+      case "University":
+        return member['university'] as String?;
+      case "Passout":
+        return member['year']?.toString(); // maybe year or some graduation info
+      default:
+        return "";
+    }
+  }
 
   @override
   void initState() {
@@ -99,6 +122,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
 
     _getprofile();
     _fetchPosts();
+    _getUserLikes();
 
     // Listen to scroll changes
     _scrollController.addListener(() {
@@ -185,6 +209,79 @@ class _PublicProfilePageState extends State<PublicProfilePage>
       setState(() {
         isInWatchList = watchlist.contains(userGroup?.groupId);
       });
+    }
+  }
+
+  void _getUserLikes() async {
+    var _userLikes = await AppVariables.getPersistent<Map<String, bool>>(
+        'likeStatusForMember');
+    if (_userLikes != null) {
+      setState(() {
+        likeStatus.addAll(_userLikes);
+      });
+    }
+    // Get the user ID to fetch their likes
+    if (widget.uid.isNotEmpty) {
+      Map<String, dynamic> result =
+          await UserService.fetchUserLikes(ids: [widget.uid], invalidate: true);
+      if (result['success']) {
+        for (var user in result['data']) {
+          likeCountForMember[user['_id']] = user['likes'];
+        }
+      }
+      setState(() {});
+    }
+  }
+
+  Future<bool> toggleLike(String userid) async {
+    // Store original state before optimistic update
+    final bool originalLikeStatus = likeStatus[userid] ?? false;
+    final int originalLikeCount = likeCountForMember[userid] ?? 0;
+
+    setState(() {
+      likeStatus[userid] = !originalLikeStatus;
+      likeCountForMember[userid] =
+          (originalLikeCount + (likeStatus[userid]! ? 1 : -1)) < 0
+              ? 0
+              : (originalLikeCount + (likeStatus[userid]! ? 1 : -1));
+    });
+    AppVariables.setPersistent<Map<String, bool>>(
+        'likeStatusForMember', likeStatus);
+
+    Map<String, dynamic> result = await UserService.likeUser(userId: userid);
+    if (result['success']) {
+      if (result['status'] == 201) {
+        AppVariables.setPersistent<Map<String, bool>>(
+            'likeStatusForMember', likeStatus);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Liked')),
+          );
+        }
+      } else if (result['status'] == 200) {
+        if (mounted) {
+          AppVariables.setPersistent<Map<String, bool>>(
+              'likeStatusForMember', likeStatus);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Like removed')),
+          );
+        }
+      }
+      return true;
+    } else {
+      // Revert to original state on failure
+      setState(() {
+        likeStatus[userid] = originalLikeStatus;
+        likeCountForMember[userid] = originalLikeCount;
+      });
+      AppVariables.setPersistent<Map<String, bool>>(
+          'likeStatusForMember', likeStatus);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'])),
+        );
+      }
+      return false;
     }
   }
 
@@ -527,301 +624,134 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                       SizedBox(width: 30),
                                     ],
                                   ),
-                                  if (userGroup!.members.isNotEmpty)
-                                    Tooltip(
-                                      message: "Add to watchList",
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          InkWell(
-                                            onTap: isInWatchList
-                                                ? () async {
-                                                    setState(() {
-                                                      isWatchListLoading = true;
-                                                    });
-                                                    Map<String, dynamic>
-                                                        result =
-                                                        await GroupsService
-                                                            .removeFromWatchList(
-                                                                userGroup!
-                                                                    .groupId);
-                                                    setState(() {
-                                                      isWatchListLoading =
-                                                          false;
-                                                    });
-                                                    if (result['success']) {
-                                                      setState(() {
-                                                        isInWatchList = false;
-                                                        AppVariables.update(
-                                                            'watchlist',
-                                                            watchlist
-                                                              ..remove(userGroup!
-                                                                  .groupId));
-                                                      });
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (BuildContext
-                                                            context) {
-                                                          return AlertDialog(
-                                                            title:
-                                                                Text('Success'),
-                                                            content: Text(
-                                                                "Group removed from watchlist successfully"),
-                                                            actions: [
-                                                              TextButton(
-                                                                child:
-                                                                    Text('OK'),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                          context)
-                                                                      .pop();
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      );
-                                                    } else {
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (BuildContext
-                                                            context) {
-                                                          return AlertDialog(
-                                                            title: Text('Error',
-                                                                style: TextStyle(
-                                                                    color: AppColors
-                                                                        .background,
-                                                                    fontFamily:
-                                                                        "Poppins")),
-                                                            content: Text(
-                                                                "Failed to remove group from watchlist: ${result['error']}",
-                                                                style: TextStyle(
-                                                                    color: Colors
-                                                                        .red,
-                                                                    fontFamily:
-                                                                        "Poppins")),
-                                                            actions: [
-                                                              TextButton(
-                                                                child:
-                                                                    Text('OK'),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                          context)
-                                                                      .pop();
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      );
-                                                    }
-                                                  }
-                                                : () async {
-                                                    setState(() {
-                                                      isWatchListLoading = true;
-                                                    });
-                                                    Map<String, dynamic>
-                                                        result =
-                                                        await GroupsService
-                                                            .addToWatchList(
-                                                                userGroup!
-                                                                    .groupId);
-                                                    setState(() {
-                                                      isWatchListLoading =
-                                                          false;
-                                                    });
-                                                    if (result['success']) {
-                                                      setState(() {
-                                                        isInWatchList = true;
-                                                        AppVariables.update(
-                                                            'watchlist',
-                                                            watchlist
-                                                              ..add(userGroup!
-                                                                  .groupId));
-                                                      });
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (BuildContext
-                                                            context) {
-                                                          return AlertDialog(
-                                                            title:
-                                                                Text('Success'),
-                                                            content: Text(
-                                                                "Group added to watchlist successfully"),
-                                                            actions: [
-                                                              TextButton(
-                                                                child:
-                                                                    Text('OK'),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                          context)
-                                                                      .pop();
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      );
-                                                    } else {
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (BuildContext
-                                                            context) {
-                                                          return AlertDialog(
-                                                            title: Text('Error',
-                                                                style: TextStyle(
-                                                                    color: AppColors
-                                                                        .background,
-                                                                    fontFamily:
-                                                                        "Poppins")),
-                                                            content: Text(
-                                                                "Failed to add group to watchlist: ${result['error']}",
-                                                                style: TextStyle(
-                                                                    color: Colors
-                                                                        .red,
-                                                                    fontFamily:
-                                                                        "Poppins")),
-                                                            actions: [
-                                                              TextButton(
-                                                                child:
-                                                                    Text('OK'),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                          context)
-                                                                      .pop();
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      );
-                                                    }
-                                                  },
-                                            child: CircleAvatar(
-                                              radius: 15,
-                                              backgroundColor:
-                                                  Colors.transparent,
-                                              child: isWatchListLoading
-                                                  ? CircularProgressIndicator()
-                                                  : Icon(
-                                                      isInWatchList
-                                                          ? Icons.visibility_off
-                                                          : Icons
-                                                              .visibility_outlined,
-                                                      color: Colors.red,
-                                                      size: 30,
-                                                    ),
-                                            ),
-                                          ),
-                                          Text(
-                                              isInWatchList
-                                                  ? 'not watch'
-                                                  : 'watch',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.black,
-                                              ))
-                                        ],
-                                      ),
-                                    ),
+                                  // Like button for the user profile
+                                  LikeButton(
+                                    buttonType: ButtonType.user,
+                                    postId: widget.uid,
+                                    initialLikes:
+                                        likeCountForMember[widget.uid] ?? 0,
+                                    initiallyLiked:
+                                        likeStatus[widget.uid] ?? false,
+                                    showLikeCount: true,
+                                    // Custom colors for white background
+                                    likedColor: Colors.red,
+                                    unlikedColor: Colors.grey,
+                                    textColor: Colors.black87,
+                                    iconSize: 32,
+                                    fontSize: 14,
+                                    onLikeChanged: (isLiked) async {
+                                      return await toggleLike(widget.uid);
+                                    },
+                                  ),
                                 ],
                               ),
                             ),
+                            // Padding(
+                            //   padding: const EdgeInsets.symmetric(
+                            //       horizontal: 20, vertical: 10),
+                            //   child: GestureDetector(
+                            //     onTap: () {
+                            //       showDialog(
+                            //         context: context,
+                            //         builder: (BuildContext context) {
+                            //           final bioList = userProfile?['bio'] ?? [];
+                            //           bioList.removeWhere((bio) => bio == null);
+                            //           return AlertDialog(
+                            //             backgroundColor: AppColors.background,
+                            //             shape: RoundedRectangleBorder(
+                            //                 borderRadius:
+                            //                     BorderRadius.circular(20)),
+                            //             title: Row(
+                            //               children: [
+                            //                 Icon(Icons.info_outline,
+                            //                     color: AppColors.textSecondary),
+                            //                 SizedBox(width: 8),
+                            //                 Text('Bio History',
+                            //                     style: TextStyle(
+                            //                         fontFamily: "Poppins",
+                            //                         color: AppColors.primary)),
+                            //               ],
+                            //             ),
+                            //             content: bioList.isEmpty
+                            //                 ? Text("No bio available.",
+                            //                     style: TextStyle(
+                            //                         fontFamily: "Poppins",
+                            //                         color: AppColors.success))
+                            //                 : SizedBox(
+                            //                     width: double.maxFinite,
+                            //                     child: ListView.separated(
+                            //                       shrinkWrap: true,
+                            //                       itemCount: bioList.length,
+                            //                       separatorBuilder: (_, __) =>
+                            //                           Divider(),
+                            //                       itemBuilder: (context, idx) {
+                            //                         final bioObj =
+                            //                             GroupsService.parseBio(
+                            //                                 bioList[idx]);
+                            //                         return ListTile(
+                            //                           title: Text(
+                            //                             bioObj.bio ?? "No bio",
+                            //                             style: TextStyle(
+                            //                                 fontFamily:
+                            //                                     "Poppins",
+                            //                                 color:
+                            //                                     Colors.white),
+                            //                           ),
+                            //                           subtitle: Text(
+                            //                             "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
+                            //                             style: TextStyle(
+                            //                               fontSize: 12,
+                            //                               color:
+                            //                                   Colors.grey[700],
+                            //                               fontFamily: "Poppins",
+                            //                             ),
+                            //                           ),
+                            //                         );
+                            //                       },
+                            //                     ),
+                            //                   ),
+                            //             actions: [
+                            //               TextButton(
+                            //                 child: Text('Close',
+                            //                     style: TextStyle(
+                            //                         fontFamily: "Poppins",
+                            //                         color: AppColors.primary)),
+                            //                 onPressed: () =>
+                            //                     Navigator.of(context).pop(),
+                            //               ),
+                            //             ],
+                            //           );
+                            //         },
+                            //       );
+                            //     },
+                            //     child: Text(
+                            //       userProfile?['bio'].length > 0 &&
+                            //               !(userProfile?['bio'] as List)
+                            //                   .every((bio) => bio == null)
+                            //           ? "#${GroupsService.parseBio(userProfile?['bio'].last).editedBy ?? ''} ${GroupsService.parseBio(userProfile?['bio'].last).bio}"
+                            //           : 'No bio available',
+                            //       style: TextStyle(
+                            //           fontSize: 14,
+                            //           color: AppColors.background,
+                            //           fontFamily: "Poppins"),
+                            //       textAlign: TextAlign.left,
+                            //     ),
+                            //   ),
+                            // ),
+
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 10),
-                              child: GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      final bioList = userProfile?['bio'] ?? [];
-                                      bioList.removeWhere((bio) => bio == null);
-                                      return AlertDialog(
-                                        backgroundColor: AppColors.background,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(20)),
-                                        title: Row(
-                                          children: [
-                                            Icon(Icons.info_outline,
-                                                color: AppColors.textSecondary),
-                                            SizedBox(width: 8),
-                                            Text('Bio History',
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: AppColors.primary)),
-                                          ],
-                                        ),
-                                        content: bioList.isEmpty
-                                            ? Text("No bio available.",
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: AppColors.success))
-                                            : SizedBox(
-                                                width: double.maxFinite,
-                                                child: ListView.separated(
-                                                  shrinkWrap: true,
-                                                  itemCount: bioList.length,
-                                                  separatorBuilder: (_, __) =>
-                                                      Divider(),
-                                                  itemBuilder: (context, idx) {
-                                                    final bioObj =
-                                                        GroupsService.parseBio(
-                                                            bioList[idx]);
-                                                    return ListTile(
-                                                      title: Text(
-                                                        bioObj.bio ?? "No bio",
-                                                        style: TextStyle(
-                                                            fontFamily:
-                                                                "Poppins",
-                                                            color:
-                                                                Colors.white),
-                                                      ),
-                                                      subtitle: Text(
-                                                        "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color:
-                                                              Colors.grey[700],
-                                                          fontFamily: "Poppins",
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                        actions: [
-                                          TextButton(
-                                            child: Text('Close',
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: AppColors.primary)),
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
-                                child: Text(
-                                  userProfile?['bio'].length > 0 &&
-                                          !(userProfile?['bio'] as List)
-                                              .every((bio) => bio == null)
-                                      ? "#${GroupsService.parseBio(userProfile?['bio'].last).editedBy ?? ''} ${GroupsService.parseBio(userProfile?['bio'].last).bio}"
-                                      : 'No bio available',
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.background,
-                                      fontFamily: "Poppins"),
-                                  textAlign: TextAlign.left,
-                                ),
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                _getEducationField(userProfile ?? {}) ??
+                                    "No Education",
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.background,
+                                    fontFamily: "Poppins"),
+                                textAlign: TextAlign.left,
                               ),
                             ),
+
                             Divider(
                               color: const Color.fromARGB(95, 158, 158, 158),
                               thickness: 1,

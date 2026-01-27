@@ -375,4 +375,35 @@ class UserService {
       return {'success': false, 'error': e.toString()};
     }
   }
+
+  static Future<Map<String, dynamic>> updateProfilePic(
+      {String? profilePic}) async {
+    try {
+      final url = Uri.parse('$baseurl/myprofile/image');
+      String? token = await UserService.getAccessToken();
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "image": profilePic,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      } else {
+        return {
+          'success': false,
+          'error':
+              jsonDecode(response.body)['message'] ?? 'Unknown error occurred',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 }

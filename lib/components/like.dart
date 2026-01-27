@@ -11,13 +11,27 @@ class LikeButton extends StatefulWidget {
   final bool showLikeCount;
   final Future<bool> Function(bool isLiked) onLikeChanged;
 
-  LikeButton({
+  // Customization properties
+  final Color? likedColor;
+  final Color? unlikedColor;
+  final Color? textColor;
+  final double? iconSize;
+  final double? fontSize;
+
+  const LikeButton({
+    super.key,
     required this.buttonType,
     required this.initialLikes,
     required this.initiallyLiked,
     required this.onLikeChanged,
     this.showLikeCount = false,
     required this.postId,
+    // Customization with sensible defaults
+    this.likedColor,
+    this.unlikedColor,
+    this.textColor,
+    this.iconSize,
+    this.fontSize,
   });
 
   @override
@@ -28,6 +42,19 @@ class _LikeButtonState extends State<LikeButton> {
   late bool isLiked;
   late int likes;
   late SharedPreferences prefs;
+
+  // Default colors based on button type
+  Color get _likedColor => widget.likedColor ?? Colors.red;
+  Color get _unlikedColor =>
+      widget.unlikedColor ??
+      (widget.buttonType == ButtonType.post ? Colors.grey : Colors.white54);
+  Color get _textColor =>
+      widget.textColor ??
+      (widget.buttonType == ButtonType.post ? Colors.white : Colors.white54);
+  double get _iconSize =>
+      widget.iconSize ?? (widget.buttonType == ButtonType.post ? 24.0 : 20.0);
+  double get _fontSize =>
+      widget.fontSize ?? (widget.buttonType == ButtonType.post ? 16.0 : 10.0);
 
   @override
   void initState() {
@@ -55,11 +82,11 @@ class _LikeButtonState extends State<LikeButton> {
 
   String formatLikes(int number) {
     if (number >= 1000000000) {
-      return (number / 1000000000).toStringAsFixed(1) + 'B';
+      return '${(number / 1000000000).toStringAsFixed(1)}B';
     } else if (number >= 1000000) {
-      return (number / 1000000).toStringAsFixed(1) + 'M';
+      return '${(number / 1000000).toStringAsFixed(1)}M';
     } else if (number >= 1000) {
-      return (number / 1000).toStringAsFixed(1) + 'K';
+      return '${(number / 1000).toStringAsFixed(1)}K';
     } else {
       return number.toString();
     }
@@ -67,17 +94,19 @@ class _LikeButtonState extends State<LikeButton> {
 
   void loadLike() async {
     prefs = await SharedPreferences.getInstance();
-    if (widget.postId != null) {
-      final like = await prefs.getString(widget.postId!);
-      if (like != null) {
-        setState(() {
-          isLiked = true;
-        });
-      }
+    final like = prefs.getString(widget.postId);
+    if (like != null) {
+      setState(() {
+        isLiked = true;
+      });
     }
   }
 
   void toggleLike() async {
+    // Store original state before optimistic update
+    final bool originalIsLiked = isLiked;
+    final int originalLikes = likes;
+
     setState(() {
       isLiked = !isLiked;
       likes += isLiked ? 1 : -1;
@@ -86,18 +115,14 @@ class _LikeButtonState extends State<LikeButton> {
 
     bool result = await widget.onLikeChanged(isLiked); // Notify parent widget
     if (result == false) {
-      if (widget.postId != null) {
-        await prefs.remove(widget.postId!);
-      }
+      await prefs.remove(widget.postId);
+      // Revert to original state on failure
       setState(() {
-        isLiked = false;
-        likes += isLiked ? 1 : -1;
-        if (likes < 0) likes = 0;
+        isLiked = originalIsLiked;
+        likes = originalLikes;
       });
     } else {
-      if (widget.postId != null) {
-        prefs.setString(widget.postId!, isLiked.toString());
-      }
+      prefs.setString(widget.postId, isLiked.toString());
     }
   }
 
@@ -113,13 +138,14 @@ class _LikeButtonState extends State<LikeButton> {
                 onTap: toggleLike,
                 child: Icon(
                   Icons.favorite,
-                  color: isLiked ? Colors.red : Colors.white54,
+                  color: isLiked ? _likedColor : _unlikedColor,
+                  size: _iconSize,
                 ),
               ),
               if (widget.showLikeCount)
                 Text(
                   formatLikes(likes),
-                  style: TextStyle(fontSize: 10, color: Colors.white54),
+                  style: TextStyle(fontSize: _fontSize, color: _textColor),
                 ),
             ],
           );
@@ -127,7 +153,7 @@ class _LikeButtonState extends State<LikeButton> {
 
   Widget buildLikeButtonForPosts() {
     return Container(
-      padding: EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(8.0),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -135,17 +161,17 @@ class _LikeButtonState extends State<LikeButton> {
             onTap: toggleLike,
             child: Icon(
               Icons.favorite,
-              color: isLiked ? Colors.red : Colors.grey,
-              size: 24.0,
+              color: isLiked ? _likedColor : _unlikedColor,
+              size: _iconSize,
             ),
           ),
-          SizedBox(width: 8.0),
+          const SizedBox(width: 8.0),
           Text(
             formatLikes(likes),
             style: TextStyle(
-              fontSize: 16.0,
+              fontSize: _fontSize,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: _textColor,
             ),
           ),
         ],

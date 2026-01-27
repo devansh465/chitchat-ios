@@ -569,22 +569,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     _voted.add(id);
   }
 
-  Timer? _notificationTimer;
-
-  void _startNotificationTimer() {
-    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted) {
-        _getGroupJoinReqests();
-        _getNotification();
-      }
-      print(
-          'Notifications refreshed at ${DateTime.now()} , $_unifiedNotifications');
-    });
-  }
+  // Timer removed - centralized NotificationManager handles polling
 
   @override
   void dispose() {
-    _notificationTimer?.cancel();
     _scrollController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -599,7 +587,6 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     NotificationService.clearAllUnreadNotifications();
-    _startNotificationTimer();
     _getMyprofile().then((_) {
       _getGroupJoinReqests();
       _getNotification();

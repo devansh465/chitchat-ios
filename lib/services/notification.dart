@@ -1,5 +1,6 @@
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/services/notification_manager.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -196,31 +197,14 @@ class NotificationService {
     );
   }
 
-// Save unique unread IDs and update count
+// Save unique unread IDs and update count (now delegates to NotificationManager for deduplication)
   static Future<void> storeUnreadIds(List<String> newIds) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Get already stored unread IDs
-    List<String> storedIds = prefs.getStringList("unreadIds") ?? [];
-
-    // Add only new unique IDs
-    for (String id in newIds) {
-      if (!storedIds.contains(id)) {
-        storedIds.add(id);
-      }
-    }
-
-    // Save updated unique list
-    await prefs.setStringList("unreadIds", storedIds);
-
-    // Update unread count
-    await prefs.setInt("unreadcount", storedIds.length);
+    await NotificationManager.instance.storeUnreadIds(newIds);
   }
 
-// Get unread count
+// Get unread count (reads from local storage only, no API call)
   static Future<int> getNotificationCount() async {
     final prefs = await SharedPreferences.getInstance();
-    getNotifications(null, showLoaders: false);
     return prefs.getInt("unreadcount") ?? 0;
   }
 
@@ -252,10 +236,7 @@ class NotificationService {
 
 //clear all unread notifications
   static Future<void> clearAllUnreadNotifications() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove("unreadIds");
-    await prefs.remove("unreadcount");
-    NotificationIcon.updateCount(0, NotificationIconType.Notification);
+    await NotificationManager.instance.clearAllUnread();
   }
 
 // fetch notifications

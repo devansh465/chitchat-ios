@@ -13,6 +13,7 @@ import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/screens/searchResults.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
+import 'package:chitchat/services/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:image_picker/image_picker.dart';
@@ -83,11 +84,41 @@ class _SearchPageState extends State<SearchPage> {
   double scale = 0.0;
   bool isLoading = true;
   bool isLoadingError = false;
+  void _getMyuniversity() async {
+    var searchResultGroups = await SearchService.searchByUniversity(
+      AppVariables.get<Map<String, dynamic>>("profile")?["university"],
+    );
+
+    topUniversities =
+        {for (var e in topUniversities) e['_id']: e}.values.toList();
+
+    final myUniversityId = searchResultGroups[0]['_id'];
+
+    for (var uni in topUniversities) {
+      if (uni['_id'] == myUniversityId) {
+        uni['myUniversity'] = true;
+        break;
+      }
+    }
+    topUniversities.sort((a, b) {
+      if (a['myUniversity'] == true) return -1;
+      if (b['myUniversity'] == true) return 1;
+      return 0;
+    });
+
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
+    if (AppVariables.get<Map<String, dynamic>>("profile")?["university"] !=
+        null) {
+      _getMyuniversity();
+    }
     _getGroups();
   }
 
@@ -819,7 +850,7 @@ class _SearchPageState extends State<SearchPage> {
                   height: 10,
                 ),
                 Text(
-                  "Top Universities",
+                  "Recommended Universities",
                   textAlign: TextAlign.left,
                   style: TextStyle(
                       fontSize: 15,
@@ -839,7 +870,10 @@ class _SearchPageState extends State<SearchPage> {
               itemBuilder: (context, index) {
                 final user = topUniversities[index];
                 return Card(
-                  color: Colors.transparent,
+                  color: user['myUniversity'] != null &&
+                          user['myUniversity'] == true
+                      ? Color.fromRGBO(33, 25, 55, 1)
+                      : Colors.transparent,
                   margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

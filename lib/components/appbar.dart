@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/screens/notifications.dart';
-import 'package:chitchat/services/chats.dart';
-import 'package:chitchat/services/notification.dart';
+import 'package:chitchat/services/notification_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
 
@@ -11,7 +9,7 @@ enum NotificationIconType {
   Message,
 }
 
-class NotificationIcon extends StatefulWidget {
+class NotificationIcon extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
   final double iconSize;
@@ -33,116 +31,73 @@ class NotificationIcon extends StatefulWidget {
     this.badgeSize = 10,
   }) : super(key: key);
 
-  @override
-  State<NotificationIcon> createState() => _NotificationIconState();
-
-  // Global count holder
-  static final ValueNotifier<int> _NotificationCount = ValueNotifier<int>(0);
-  static final ValueNotifier<int> _MessageCount = ValueNotifier<int>(0);
-
-  // Expose it if you ever want to update from outside
+  /// Static method conserved for backward compatibility with existing code
   static void updateCount(int newCount, NotificationIconType type) {
     if (type == NotificationIconType.Notification) {
-      _NotificationCount.value = newCount;
+      NotificationManager.instance.notificationCount.value = newCount;
     } else {
-      _MessageCount.value = newCount;
+      NotificationManager.instance.messageCount.value = newCount;
     }
-  }
-}
-
-class _NotificationIconState extends State<NotificationIcon> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Poll every 30 seconds (you can adjust)
-
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      if (widget.type == NotificationIconType.Notification) {
-        try {
-          final count = await NotificationService.getNotificationCount();
-          NotificationIcon.updateCount(
-              count, NotificationIconType.Notification);
-          print("Notification count: $count");
-        } catch (e) {
-          debugPrint("Failed to fetch notification count: $e");
-        }
-      } else if (widget.type == NotificationIconType.Message) {
-        try {
-          final count = await ChatServices.getMessageNotificationCount();
-          NotificationIcon.updateCount(count, NotificationIconType.Message);
-          print("Message count: $count");
-        } catch (e) {
-          debugPrint("Failed to fetch message count: $e");
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Use the centralized NotificationManager's ValueNotifiers
+    final valueNotifier = type == NotificationIconType.Notification
+        ? NotificationManager.instance.notificationCount
+        : NotificationManager.instance.messageCount;
+
     return ValueListenableBuilder<int>(
-      valueListenable: widget.type == NotificationIconType.Notification
-          ? NotificationIcon._NotificationCount
-          : NotificationIcon._MessageCount,
+      valueListenable: valueNotifier,
       builder: (context, count, _) {
         return Stack(
           children: [
             IconButton(
-              icon: Icon(widget.icon),
-              onPressed: widget.onPressed ??
+              icon: Icon(icon),
+              onPressed: onPressed ??
                   () {
                     Navigator.push(
                       context,
                       PageTransition(
                         type: PageTransitionType.rightToLeft,
-                        child: widget.type == NotificationIconType.Notification
+                        child: type == NotificationIconType.Notification
                             ? const NotificationsScreen()
                             : const ChatScreen(),
                       ),
                     );
                   },
-              color: widget.iconColor,
-              iconSize: widget.iconSize,
-              padding: EdgeInsets.only(right: widget.rightPadding),
+              color: iconColor,
+              iconSize: iconSize,
+              padding: EdgeInsets.only(right: rightPadding),
             ),
             if (count > 0)
               Positioned(
-                right: widget.rightPadding - 5,
+                right: rightPadding - 5,
                 top: 8,
                 child: GestureDetector(
-                  onTap: widget.onPressed ??
+                  onTap: onPressed ??
                       () {
                         Navigator.push(
                           context,
                           PageTransition(
                             type: PageTransitionType.rightToLeft,
-                            child:
-                                widget.type == NotificationIconType.Notification
-                                    ? const NotificationsScreen()
-                                    : const ChatScreen(),
+                            child: type == NotificationIconType.Notification
+                                ? const NotificationsScreen()
+                                : const ChatScreen(),
                           ),
                         );
                       },
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: widget.badgeColor,
+                      color: badgeColor,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      '$count',
+                      count > 99 ? '99+' : '$count',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: widget.badgeSize,
+                        fontSize: badgeSize,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

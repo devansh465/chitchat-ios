@@ -104,6 +104,8 @@ class _MemoryViewerState extends State<MemoryViewer> {
         Map<String, dynamic> result = await PostService.createPost(
             files: [currentMemory.url], isGroupPost: true, myGroupId: groupId);
         if (result['success']) {
+          AppVariables.update("group_posts", result['data']);
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

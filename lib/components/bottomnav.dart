@@ -77,36 +77,32 @@ class _AppBottomNavState extends State<AppBottomNav> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: EdgeInsets.only(
+        left: 10,
+        right: 10,
+      ),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: Colors.transparent,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+          topLeft: Radius.circular(50),
+          topRight: Radius.circular(50),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
       ),
       child: BottomAppBar(
         height: 60,
-        notchMargin: 10,
-        shape: const CircularNotchedRectangle(),
+        notchMargin: 0,
         color: AppColors.Secondarybackground,
         child: ClipRRect(
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+            topLeft: Radius.circular(100),
+            topRight: Radius.circular(100),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _navItem(Icons.home_rounded, 0),
               _navItem(Icons.search_rounded, 1),
-              const SizedBox(width: 30), // FAB gap
+              // const SizedBox(width: 30), // FAB gap
               _navItem(Icons.favorite_rounded, 2),
               _navItem(Icons.groups, 3),
             ],

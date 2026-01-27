@@ -351,9 +351,10 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
           customStageTextDetail: "You are set! now you can close this dialog",
         );
         setState(() {
-          AppVariables.update("posts", result['data']);
           if (widget.isGroupPost == true) {
             AppVariables.update("group_posts", result['data']);
+          } else {
+            AppVariables.update("posts", result['data']);
           }
           uploadFinished = true;
         });
@@ -579,6 +580,9 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
             builder: (context) => VideoEditor(
                   file: file,
                   totalFiles: editedFiles.length,
+                  isPost: widget.isPost ?? false,
+                  isGroupPost: widget.isGroupPost ?? false,
+                  isMemory: widget.isMemory ?? false,
                 )),
       );
       if (editedVideo != null) {
@@ -906,10 +910,19 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 //VIDEO EDITOR SCREEN//
 //-------------------//
 class VideoEditor extends StatefulWidget {
-  const VideoEditor({super.key, required this.file, required this.totalFiles});
+  const VideoEditor(
+      {super.key,
+      required this.file,
+      required this.totalFiles,
+      required this.isPost,
+      required this.isGroupPost,
+      required this.isMemory});
 
   final File file;
   final int totalFiles;
+  final bool isPost;
+  final bool isGroupPost;
+  final bool isMemory;
 
   @override
   State<VideoEditor> createState() => _VideoEditorState();
@@ -1000,6 +1013,13 @@ class _VideoEditorState extends State<VideoEditor> {
       onProgress: (p) => _exportingProgress.value = p,
     ).then((_) async {
       if (widget.totalFiles > 1) {
+        Navigator.pop(context, execute.outputPath);
+        return;
+      }
+      if (widget.totalFiles > 1 ||
+          widget.isPost! ||
+          widget.isGroupPost! ||
+          widget.isMemory!) {
         Navigator.pop(context, execute.outputPath);
         return;
       }

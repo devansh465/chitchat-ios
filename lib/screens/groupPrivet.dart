@@ -382,48 +382,57 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     setState(() {});
   }
 
-  void toggleLike(String userid, {bool internal = false}) async {
+  void toggleLike(String userid) async {
+    // Store original state before optimistic update
+    final bool originalLikeStatus = likeStatus[userid] ?? false;
+    final int originalLikeCount = likeCountForMember[userid] ?? 0;
+
     print(
         "likeStatusForMember>>${await AppVariables.getPersistent<Map<String, dynamic>>('likeStatusForMember')}");
     setState(() {
-      likeStatus[userid] = !(likeStatus[userid] ?? false);
-      int? user = likeCountForMember[userid];
-      likeCountForMember[userid] = (user! + (likeStatus[userid]! ? 1 : -1)) < 0
-          ? 0
-          : (user! + (likeStatus[userid]! ? 1 : -1));
+      likeStatus[userid] = !originalLikeStatus;
+      likeCountForMember[userid] =
+          (originalLikeCount + (likeStatus[userid]! ? 1 : -1)) < 0
+              ? 0
+              : (originalLikeCount + (likeStatus[userid]! ? 1 : -1));
     });
     AppVariables.setPersistent<Map<String, bool>>(
         'likeStatusForMember', likeStatus);
     print(likeStatus);
-    if (internal == false) {
-      Map<String, dynamic> result = await UserService.likeUser(userId: userid);
-      print(result);
-      if (result['success']) {
-        print(result['data']);
-        if (result['status'] == 201) {
-          AppVariables.setPersistent<Map<String, bool>>(
-              'likeStatusForMember', likeStatus);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Liked')),
-            );
-          }
-        } else if (result['status'] == 200) {
-          if (mounted) {
-            AppVariables.setPersistent<Map<String, bool>>(
-                'likeStatusForMember', likeStatus);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('like removed')),
-            );
-          }
-        }
-      } else {
+
+    Map<String, dynamic> result = await UserService.likeUser(userId: userid);
+    print(result);
+    if (result['success']) {
+      print(result['data']);
+      if (result['status'] == 201) {
+        AppVariables.setPersistent<Map<String, bool>>(
+            'likeStatusForMember', likeStatus);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['error'])),
+            const SnackBar(content: Text('Liked')),
           );
         }
-        toggleLike(userid, internal: true);
+      } else if (result['status'] == 200) {
+        if (mounted) {
+          AppVariables.setPersistent<Map<String, bool>>(
+              'likeStatusForMember', likeStatus);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('like removed')),
+          );
+        }
+      }
+    } else {
+      // Revert to original state on failure
+      setState(() {
+        likeStatus[userid] = originalLikeStatus;
+        likeCountForMember[userid] = originalLikeCount;
+      });
+      AppVariables.setPersistent<Map<String, bool>>(
+          'likeStatusForMember', likeStatus);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'])),
+        );
       }
     }
   }
@@ -1273,7 +1282,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                               controller: scrollController,
                               gridDelegate:
                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 4,
+                                crossAxisCount: 3,
                               ),
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
@@ -1372,14 +1381,27 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                             },
                                           )
                                         : memory.type == MessageType.image
-                                            ? CachedNetworkImage(
-                                                imageUrl: memory.url,
-                                                placeholder: (context, url) =>
-                                                    const CircularProgressIndicator(),
-                                                errorWidget:
-                                                    (context, url, error) =>
+                                            ? Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade200,
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.all(4),
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  child: CachedNetworkImage(
+                                                    imageUrl: memory.url,
+                                                    placeholder: (context,
+                                                            url) =>
+                                                        const CircularProgressIndicator(),
+                                                    errorWidget: (context, url,
+                                                            error) =>
                                                         const Icon(Icons.error),
-                                              )
+                                                  ),
+                                                ))
                                             : null,
                                   ),
                                 );

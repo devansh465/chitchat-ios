@@ -5,10 +5,14 @@ import 'package:better_open_file/better_open_file.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:camerawesome/pigeon.dart';
 import 'package:chitchat/screens/filePreview.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gallery_saver_plus/gallery_saver.dart';
 import 'package:vs_media_picker/vs_media_picker.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 
 class CreatePost {
   // late StreamSubscription<MediaCapture?> _captureStateSubscription;
@@ -23,6 +27,110 @@ class CreatePost {
       required String? myGroupId}) {
     ValueNotifier<bool> isNextButtonVisible = ValueNotifier(false);
     List<PickedAssetModel> selectedFiles = <PickedAssetModel>[];
+    if (isMemory) {
+      ImagePicker picker = ImagePicker();
+      BuildContext rootcontext = context;
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: false,
+        builder: (context) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // drag handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+
+                  _MediaTile(
+                    icon: Icons.image_rounded,
+                    color: Colors.blue,
+                    title: 'Pick Image',
+                    onTap: () async {
+                      Navigator.pop(context);
+
+                      final XFile? image =
+                          await picker.pickImage(source: ImageSource.gallery);
+
+                      if (image == null) return;
+
+                      final asset = PickedAssetModel(
+                        id: image.path,
+                        path: image.path,
+                        type: 'image',
+                      );
+
+                      Navigator.push(
+                        rootcontext,
+                        MaterialPageRoute(
+                          builder: (context) => FilePreviewPage(
+                            files: [asset],
+                            isGroupPost: isGroupPost,
+                            isPost: isPost,
+                            isMemory: isMemory,
+                            myGroupId: myGroupId,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _MediaTile(
+                    icon: Icons.videocam_rounded,
+                    color: Colors.red,
+                    title: 'Pick Video',
+                    onTap: () async {
+                      Navigator.pop(context);
+
+                      final XFile? video =
+                          await picker.pickVideo(source: ImageSource.gallery);
+
+                      if (video == null) return;
+
+                      final asset = PickedAssetModel(
+                        id: video.path,
+                        path: video.path,
+                        type: 'video',
+                      );
+
+                      Navigator.push(
+                        rootcontext,
+                        MaterialPageRoute(
+                          builder: (context) => FilePreviewPage(
+                            files: [asset],
+                            isGroupPost: isGroupPost,
+                            isPost: isPost,
+                            isMemory: isMemory,
+                            myGroupId: myGroupId,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -33,7 +141,7 @@ class CreatePost {
           VSMediaPicker(
             maxPickImages: 100,
             gridViewController: _scrollController2,
-            singlePick: false,
+            singlePick: isMemory ? true : false,
             onlyImages: false,
             appBarColor: Colors.black,
             gridViewPhysics: const ScrollPhysics(),
@@ -220,5 +328,37 @@ class CreatePost {
   // Function to preview the file
   void _previewFile(String filePath) {
     OpenFile.open(filePath);
+  }
+}
+
+class _MediaTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final VoidCallback onTap;
+
+  const _MediaTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: color.withOpacity(0.15),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: onTap,
+    );
   }
 }
