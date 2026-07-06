@@ -248,11 +248,19 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
   void shareGroupInvitation() {
     if (groupDetails == null) return;
+    final size = MediaQuery.of(context).size;
+
+final rect = Rect.fromCenter(
+  center: Offset(size.width / 2, size.height / 2),
+  width: 1,
+  height: 1,
+);
     SharePlus.instance.share(ShareParams(
       title: "Invite ur frndcircle",
       text:
           'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}',
       subject: 'Join my group on ChitChat!',
+    sharePositionOrigin: rect
     ));
   }
 
@@ -911,12 +919,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             onSelected: (value) async {
               switch (value) {
                 case 'share':
-                  SharePlus.instance.share(ShareParams(
-                    title: "Invite ur frndcircle",
-                    text:
-                        'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}',
-                    subject: 'Join my group on ChitChat!',
-                  ));
+                  shareGroupInvitation();
                   break;
                 case 'leave':
                   showDialog(
