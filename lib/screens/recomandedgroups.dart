@@ -109,191 +109,189 @@ class _RecomandedgroupsState extends State<Recomandedgroups>
           ),
         );
       },
-      child: SafeArea(
-        child: Scaffold(
-          body: Container(
-            decoration: BoxDecoration(
-              color: AppColors.background,
-            ),
-            child: Column(
-              children: [
-                SizedBox(height: 20),
-                Text(
-                  "Join or Create",
+      child: Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            color: AppColors.background,
+          ),
+          child: Column(
+            children: [
+              SizedBox(height: 20),
+              Text(
+                "Join or Create",
+                style: TextStyle(
+                    fontSize: 30,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
+              Text(
+                "Your Friend Circle",
+                style: TextStyle(
+                    fontSize: 30,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
+              SizedBox(height: 10),
+              ImprovedSearchBar(
+                selectedType: selectedType,
+                onLoading: (loading) {
+                  setState(() {
+                    isLoading = loading;
+                  });
+                },
+                onSelectedType: (type) {
+                  setState(() {
+                    selectedType = type;
+                  });
+                  // Reload recommended groups when switching back to Groups
+                  if (type == 'Groups' || type == 'Passout') {
+                    _getGroups();
+                  }
+                },
+                onGroupSearchResult: (resultGroups) {
+                  setState(() {
+                    groups = resultGroups;
+                  });
+                },
+                onUserSearchResult: (results) {
+                  setState(() {
+                    searchResultUsers = results;
+                  });
+                },
+                onCollegeSearchResult: (results) {
+                  setState(() {
+                    searchResultColleges = results;
+                  });
+                },
+                onUniversitySearchResult: (results) {
+                  setState(() {
+                    searchResultUniversities = results;
+                  });
+                },
+                onSchoolSearchResult: (results) {
+                  setState(() {
+                    searchResultSchools = results;
+                  });
+                },
+                debounceDuration: Duration(milliseconds: 800),
+              ),
+              SizedBox(height: 10),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(left: 25, right: 25),
+                  child: isLoading
+                      ? Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        )
+                      : isLoadingError
+                          ? Center(
+                              child: Text('Error loading data',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white)))
+                          : _buildSearchResults(),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  _showCreateGroupDialog();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  'Create Your Own',
                   style: TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
+                    fontSize: 18,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-                Text(
-                  "Your Friend Circle",
-                  style: TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
-                ),
-                SizedBox(height: 10),
-                ImprovedSearchBar(
-                  selectedType: selectedType,
-                  onLoading: (loading) {
-                    setState(() {
-                      isLoading = loading;
-                    });
-                  },
-                  onSelectedType: (type) {
-                    setState(() {
-                      selectedType = type;
-                    });
-                    // Reload recommended groups when switching back to Groups
-                    if (type == 'Groups' || type == 'Passout') {
-                      _getGroups();
-                    }
-                  },
-                  onGroupSearchResult: (resultGroups) {
-                    setState(() {
-                      groups = resultGroups;
-                    });
-                  },
-                  onUserSearchResult: (results) {
-                    setState(() {
-                      searchResultUsers = results;
-                    });
-                  },
-                  onCollegeSearchResult: (results) {
-                    setState(() {
-                      searchResultColleges = results;
-                    });
-                  },
-                  onUniversitySearchResult: (results) {
-                    setState(() {
-                      searchResultUniversities = results;
-                    });
-                  },
-                  onSchoolSearchResult: (results) {
-                    setState(() {
-                      searchResultSchools = results;
-                    });
-                  },
-                  debounceDuration: Duration(milliseconds: 800),
-                ),
-                SizedBox(height: 10),
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    margin: EdgeInsets.only(left: 25, right: 25),
-                    child: isLoading
-                        ? Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
+              ),
+              InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: Text(
+                          'Skip Group Creation',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        content: Text(
+                          'You cannot do anything in this app until you create or join one group.',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontFamily: 'Poppins',
+                              ),
                             ),
-                          )
-                        : isLoadingError
-                            ? Center(
-                                child: Text('Error loading data',
-                                    style: TextStyle(
-                                        fontSize: 20,
-                                        fontFamily: 'Poppins',
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white)))
-                            : _buildSearchResults(),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    _showCreateGroupDialog();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                  context,
+                                  PageTransition(
+                                      type: PageTransitionType.leftToRight,
+                                      child: HomePage(),
+                                      duration: Duration(milliseconds: 400)));
+                            },
+                            child: Text(
+                              'Skip',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      );
+                    },
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    'Create Your Own',
+                    'Skip >',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Colors.grey[600],
                     ),
                   ),
                 ),
-                InkWell(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          title: Text(
-                            'Skip Group Creation',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          content: Text(
-                            'You cannot do anything in this app until you create or join one group.',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                    context,
-                                    PageTransition(
-                                        type: PageTransitionType.leftToRight,
-                                        child: HomePage(),
-                                        duration: Duration(milliseconds: 400)));
-                              },
-                              child: Text(
-                                'Skip',
-                                style: TextStyle(
-                                  color: Colors.blue,
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Skip >',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -724,14 +722,14 @@ class _RecomandedgroupsState extends State<Recomandedgroups>
             return StatefulBuilder(
               builder: (BuildContext ctx, StateSetter setSheetState) {
                 // Wire up the lifecycle callback so share-detect can update UI
-                _onShareResumed = () {
-                  if (shareCount < 6) {
-                    setSheetState(() {
-                      circleShared[shareCount] = true;
-                      shareCount++;
-                    });
-                  }
-                };
+                // _onShareResumed = () {
+                //   if (shareCount < 6) {
+                //     setSheetState(() {
+                //       circleShared[shareCount] = true;
+                //       shareCount++;
+                //     });
+                //   }
+                // };
 
                 // Delayed skip button (fire-once)
                 if (!skipTimerStarted) {
@@ -754,14 +752,31 @@ class _RecomandedgroupsState extends State<Recomandedgroups>
                 void triggerShare() {
                   _shareTriggeredAt = DateTime.now();
                   _waitingForShareResult = true;
+                   final size = MediaQuery.of(context).size;
+
+final rect = Rect.fromCenter(
+  center: Offset(size.width / 2, size.height / 2),
+  width: 1,
+  height: 1,
+);
                   SharePlus.instance.share(ShareParams(
                     title: 'join my frndcircle 🔥',
                     text:
                         'Join our group $groupName!\n\nhttps://groups.chitzchat.com/join?group=$groupId',
                     subject: 'Join my group on ChitChat!',
+                    sharePositionOrigin: rect,
                   ));
+                  Future.delayed(Duration(milliseconds: 1000), () {
+                    _waitingForShareResult = false;
+                   shareCount++;
+                  if (shareCount <= 6) {
+                    setSheetState(() {
+                      circleShared[shareCount - 1] = true;
+                    });
                 }
-
+                  });
+                  
+                }
                 void showSkipConfirmation() {
                   showDialog(
                     context: ctx,
