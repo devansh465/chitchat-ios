@@ -733,7 +733,7 @@ final rect = Rect.fromCenter(
               ListTile(
                 leading:
                     const Icon(Icons.video_collection, color: Colors.white),
-                title: const Text('Pick Video',
+                title: const Text('Pick Videos',
                     style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
