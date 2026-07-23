@@ -481,14 +481,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         if (Platform.isIOS) ...[
           const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 50.0),
-            child: SignInWithAppleButton(
-              onPressed: widget.onAppleLogin ?? () {},
-              height: 54,
-              borderRadius: BorderRadius.circular(30),
+          // Padding(
+          //   padding: const EdgeInsets.symmetric(horizontal: 50.0),
+          //   child: SignInWithAppleButton(
+          //     onPressed: widget.onAppleLogin ?? () {},
+          //     height: 54,
+          //     borderRadius: BorderRadius.circular(30),
+          //   ),
+          // ),
+           Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 50.0),
+          child: ElevatedButton(
+            onPressed: widget.onAppleLogin ?? () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E90FF),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+              minimumSize: const Size(double.infinity, 54),
+              elevation: 5,
             ),
+            child: const Text('login with Apple',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontFamily: 'PassionOne',
+                    letterSpacing: 0.5)),
           ),
+        ),
+        
         ],
         TextButton(
           onPressed: widget.onAdminLogin,
